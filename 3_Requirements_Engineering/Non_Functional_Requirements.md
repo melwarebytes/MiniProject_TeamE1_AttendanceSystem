@@ -1,0 +1,56 @@
+# Non-Functional and Security Requirements
+
+## Non-Functional Requirements
+
+Each non-functional requirement is quantified and has a stated measurement method.
+
+| **ID** | **Category**    | **Requirement**                                                                                                                                                                                                                                                          | **How measured**                                   |
+|--------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| NFR-01 | Performance     | For up to 500 concurrent users, 95% of API requests shall complete within 2 s and 99% within 4 s, measured at the server. Submitting a 200-student roster shall complete within 3 s.                                                                                     | Load test with k6 against the staging environment  |
+| NFR-02 | Scalability     | The system shall handle 300 QR check-ins within a 60-second period (a full lecture hall) with an error rate below 0.5%.                                                                                                                                                  | Burst load test on POST /checkins                  |
+| NFR-03 | Availability    | The system shall be available 99.5% of the time between 07:00 and 20:00 IST on working days, excluding announced maintenance, which shall be scheduled outside these hours.                                                                                              | Uptime monitor with 1-minute probes                |
+| NFR-04 | Reliability     | The database shall be backed up automatically every 24 hours, with backups kept for 30 days. After a failure, service shall be restored within 4 hours (RTO) with no more than 24 hours of data lost (RPO); committed attendance records shall never be partially saved. | Quarterly restore drill; transaction rollback test |
+| NFR-05 | Usability       | A faculty member who has never used the system shall be able to mark attendance for a session in under 3 minutes without help, and at least 80% of surveyed users shall rate the interface 4 or higher on a 5-point scale.                                               | Usability test with 5 faculty and 10 students      |
+| NFR-06 | Compatibility   | The web app shall work on the two latest major versions of Chrome, Firefox, Edge and Safari, and the student app on Android 10+ and iOS 15+, at screen widths from 360 px to 1920 px.                                                                                    | Cross-browser test matrix                          |
+| NFR-07 | Accessibility   | All pages shall meet WCAG 2.1 Level AA: full keyboard navigation, text contrast of at least 4.5:1, and labels on every form field.                                                                                                                                       | axe-core automated scan plus manual keyboard check |
+| NFR-08 | Maintainability | Backend business logic shall have at least 70% unit-test line coverage; the codebase shall pass linting with zero errors; and each module shall be deployable with its database migrations through the CI pipeline.                                                      | CI coverage report and lint gate                   |
+| NFR-09 | Compliance      | Personal data shall be processed in line with India's Digital Personal Data Protection Act, 2023: collected only for attendance purposes, kept for the student's enrolment period plus 2 years, and then deleted or anonymised.                                          | Retention job audit; data inventory review         |
+
+## Security Requirements
+
+### Security Objectives
+
+The security objectives state what must be protected and why. They were derived from the main threats to an attendance system: disclosure of student data, forged or altered attendance (especially proxy check-ins), untraceable changes, and denial of service during class hours.
+
+| **ID** | **Objective**   | **Description**                                                                                                                            |
+|--------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| SO-01  | Confidentiality | Student personal data and attendance records are visible only to the student, the faculty teaching that student, and administrators.       |
+| SO-02  | Integrity       | Attendance records reflect actual presence: they cannot be forged (for example, proxy attendance via shared QR codes) or silently altered. |
+| SO-03  | Accountability  | Every create, update or approval of attendance data can be traced to an authenticated individual and a time.                               |
+| SO-04  | Availability    | The service withstands credential-stuffing and request-flooding attempts so that legitimate users can mark attendance during class hours.  |
+
+### Security Requirements
+
+| **ID** | **Requirement**                           | **Specification**                                                                                                                                                                                                                                                                                                                                                                | **Objective(s)** |
+|--------|-------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+| SR-01  | Password storage and policy               | Passwords shall be at least 10 characters, checked against a list of commonly breached passwords, and stored only as bcrypt hashes with a cost factor of at least 12.                                                                                                                                                                                                            | SO-01, SO-03     |
+| SR-02  | Server-side role-based access control     | Every API endpoint shall enforce role and ownership checks on the server (e.g. a Faculty member may access only sections assigned to them; a Student only their own records). Unauthorised requests shall receive HTTP 403 and be logged.                                                                                                                                        | SO-01, SO-02     |
+| SR-03  | Encryption in transit and at rest         | All traffic shall use TLS 1.2 or later with HSTS enabled; plain HTTP shall redirect to HTTPS. Database volumes and backups shall be encrypted with AES-256.                                                                                                                                                                                                                      | SO-01            |
+| SR-04  | Brute-force protection                    | After 5 consecutive failed logins for an account, that account shall be locked for 15 minutes. Each IP address shall be limited to 20 login attempts per minute and 300 API requests per minute; excess requests receive HTTP 429.                                                                                                                                               | SO-04, SO-01     |
+| SR-05  | Tamper-resistant QR tokens                | QR tokens shall be signed with HMAC-SHA256 using a server-side secret, shall embed the session ID, a random nonce and an expiry no more than 30 s after issue, and shall be accepted only from an authenticated Student enrolled in that session. A student may check in at most once per session.                                                                               | SO-02            |
+| SR-06  | Append-only audit trail                   | Every login, attendance create/update, correction approval, leave decision and configuration change shall be written to an audit log containing actor ID, role, action, entity, old and new values, IP address and UTC timestamp. The application's database role shall have INSERT but not UPDATE or DELETE rights on the audit table. Audit entries shall be kept for 3 years. | SO-03, SO-02     |
+| SR-07  | Session management                        | Access tokens shall expire after 15 minutes and refresh tokens after 7 days or 30 minutes of inactivity, whichever comes first. Refresh tokens shall be stored in HttpOnly, Secure, SameSite=Strict cookies and revoked on logout or password change.                                                                                                                            | SO-01            |
+| SR-08  | Input validation and injection prevention | All input shall be validated against a schema on the server; all database access shall use parameterised queries; output shall be encoded to prevent XSS; uploaded files shall be checked by content type (not just extension), size-limited and stored outside the web root under random names.                                                                                 | SO-02, SO-01     |
+
+### Threat-to-Control Summary
+
+| **Threat (STRIDE)**    | **Example**                                                                    | **Mitigated by**           |
+|------------------------|--------------------------------------------------------------------------------|----------------------------|
+| Spoofing               | Stolen or guessed password; student shares QR code image with an absent friend | SR-01, SR-04, SR-05, SR-07 |
+| Tampering              | Faculty or student alters records via direct API calls; SQL injection          | SR-02, SR-06, SR-08        |
+| Repudiation            | Faculty denies changing a record                                               | SR-06                      |
+| Information disclosure | Student views classmates' records; traffic sniffing on campus Wi-Fi            | SR-02, SR-03               |
+| Denial of service      | Credential stuffing or request floods at 9 a.m.                                | SR-04                      |
+| Elevation of privilege | Student calls admin endpoints                                                  | SR-02                      |
+
+**Residual risk:** a student physically present can still scan and relay a code to an absent friend in real time within its 30-second life. Release 1.0 accepts this risk; faculty head-counts and the manual override (FR-06) remain available. Optional geofencing is listed for a future release.

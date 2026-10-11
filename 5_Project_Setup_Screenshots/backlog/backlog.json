@@ -1,0 +1,241 @@
+{
+  "project_title": "SAMS - Sprint Board",
+  "sprints": [
+    { "name": "Sprint 1", "start": "2026-10-19", "due": "2026-10-23",
+      "goal": "Working core: log in by role, admin sets up users/courses/sessions, faculty marks attendance manually, student sees their dashboard." },
+    { "name": "Sprint 2", "start": "2026-10-26", "due": "2026-10-30",
+      "goal": "Complete release 1.0: QR check-in, corrections, leave, alerts, reports, audit log, policies, and the non-functional checks." }
+  ],
+  "items": [
+    {
+      "id": "SETUP-01", "title": "Project scaffolding: React SPA, Express API, PostgreSQL + Redis via Docker Compose",
+      "type": "setup", "priority": "High", "points": 3, "sprint": "Sprint 1", "owner": "merull",
+      "refs": "SADS §2–3, SR-08",
+      "story": "As a developer, I want a runnable skeleton of the frontend, API and databases so that the team can build features in parallel.",
+      "ac": [
+        "`docker compose up` starts the client, API, PostgreSQL 15 and Redis 7",
+        "API exposes GET /api/v1/health returning 200",
+        "Server-side request validation middleware and parameterised DB access are in place (SR-08)",
+        "README explains how to run the project locally"
+      ]
+    },
+    {
+      "id": "SETUP-02", "title": "GitHub Actions CI: lint and test on every pull request",
+      "type": "setup", "priority": "High", "points": 2, "sprint": "Sprint 1", "owner": "merull",
+      "refs": "NFR-08, STP §5",
+      "story": "As a team, we want every PR checked automatically so that broken code is not merged.",
+      "ac": [
+        "Workflow runs on push and pull_request to main",
+        "Lint and unit tests run for client and server",
+        "main is protected: PRs need a passing check and one review before merge"
+      ]
+    },
+    {
+      "id": "SETUP-03", "title": "Database schema and migrations",
+      "type": "setup", "priority": "High", "points": 3, "sprint": "Sprint 1", "owner": "raj",
+      "refs": "SADS §8, SR-06",
+      "story": "As a developer, I want the data model from the SADS as versioned migrations so that every environment has the same schema.",
+      "ac": [
+        "Tables for users, courses, sections, enrolments, sessions, attendance, leave, corrections, audit_log, policies",
+        "Attendance percentage view matches SADS §8.2",
+        "Application DB role has INSERT but not UPDATE/DELETE on audit_log (SR-06)",
+        "Seed script creates demo Admin, Faculty and Student accounts"
+      ]
+    },
+    {
+      "id": "FR-01", "title": "User authentication and role-based access",
+      "type": "feature", "priority": "High", "points": 5, "sprint": "Sprint 1", "owner": "merull",
+      "refs": "FR-01, SR-01–SR-04, SR-07, TC-01, TC-02, TC-16",
+      "story": "As a user, I want to log in with my institution email so that I only see the features for my role (Admin, Faculty or Student).",
+      "ac": [
+        "Valid login returns an access token with the user's role and opens the right dashboard",
+        "5 failed attempts lock the account for 15 minutes (HTTP 423)",
+        "Access tokens expire after 15 min; refresh tokens are HttpOnly, Secure, SameSite=Strict cookies",
+        "Every login attempt is written to the audit log"
+      ]
+    },
+    {
+      "id": "FR-02", "title": "Password reset",
+      "type": "feature", "priority": "Medium", "points": 3, "sprint": "Sprint 1", "owner": "merull",
+      "refs": "FR-02, SR-07, TC-16",
+      "story": "As a user who forgot my password, I want a reset link by email so that I can regain access securely.",
+      "ac": [
+        "Same response whether or not the email exists",
+        "Links are single-use and expire after 15 minutes",
+        "All existing sessions are revoked after a successful reset"
+      ]
+    },
+    {
+      "id": "FR-03", "title": "User management with bulk CSV import",
+      "type": "feature", "priority": "High", "points": 5, "sprint": "Sprint 1", "owner": "raj",
+      "refs": "FR-03, TC-03",
+      "story": "As an Admin, I want to create, update and deactivate users individually or via CSV so that I can onboard a whole batch quickly.",
+      "ac": [
+        "CSV up to 5,000 rows; invalid rows rejected individually with row number and reason, valid rows still imported",
+        "Deactivated users cannot log in; their attendance history is kept"
+      ]
+    },
+    {
+      "id": "FR-04", "title": "Course, section and enrolment management",
+      "type": "feature", "priority": "High", "points": 5, "sprint": "Sprint 1", "owner": "raj",
+      "refs": "FR-04",
+      "story": "As an Admin, I want to set up courses and sections, assign faculty and enrol students so that each section has a correct roster.",
+      "ac": [
+        "A student cannot be enrolled twice in the same course in the same semester",
+        "Roster changes apply to all sessions scheduled after the change"
+      ]
+    },
+    {
+      "id": "FR-05", "title": "Class session scheduling from timetable",
+      "type": "feature", "priority": "High", "points": 5, "sprint": "Sprint 1", "owner": "bhuvan",
+      "refs": "FR-05",
+      "story": "As an Admin or Faculty, I want sessions generated from the weekly timetable so that attendance can be taken for each class.",
+      "ac": [
+        "Sessions generated between semester start and end, skipping holidays",
+        "Faculty can add an extra session or cancel one with a reason",
+        "Cancelled sessions are excluded from attendance percentage"
+      ]
+    },
+    {
+      "id": "FR-06", "title": "Manual attendance marking",
+      "type": "feature", "priority": "High", "points": 5, "sprint": "Sprint 1", "owner": "bhuvan",
+      "refs": "FR-06, SR-02, TC-04, TC-05",
+      "story": "As a Faculty member, I want a roster defaulted to PRESENT that I can adjust and submit in one action so that taking attendance takes under a minute.",
+      "ac": [
+        "Statuses PRESENT, ABSENT, LATE; whole roster saved in one transaction",
+        "Allowed from session start until 23:59 the same day",
+        "Only faculty assigned to the section can mark it (others get 403)",
+        "One ATTENDANCE_MARKED audit entry per submission"
+      ]
+    },
+    {
+      "id": "FR-09", "title": "Student attendance dashboard",
+      "type": "feature", "priority": "High", "points": 3, "sprint": "Sprint 1", "owner": "bhuvan",
+      "refs": "FR-09, TC-09",
+      "story": "As a Student, I want to see my attendance per course and how many more classes I can miss so that I stay above the threshold.",
+      "ac": [
+        "Percentage = (PRESENT + LATE + EXCUSED) ÷ (held − cancelled) × 100, one decimal place",
+        "Can-still-miss = floor(attended ÷ threshold − held), minimum 0",
+        "A student can see only their own records"
+      ]
+    },
+    {
+      "id": "FR-07", "title": "QR-code self check-in with rotating tokens",
+      "type": "feature", "priority": "High", "points": 8, "sprint": "Sprint 2", "owner": "merull",
+      "refs": "FR-07, SR-05, TC-06, TC-07",
+      "story": "As a Faculty member, I want to show a rotating QR code that enrolled students scan so that attendance is fast and proxies are hard.",
+      "ac": [
+        "Faculty opens a 1–10 minute window; QR rotates every 30 s",
+        "Tokens are HMAC-SHA256 signed with session ID, nonce and expiry",
+        "Expired → QR_EXPIRED, repeat → DUPLICATE_CHECKIN, not enrolled → NOT_ENROLLED, tampered → INVALID_TOKEN",
+        "Faculty can override any QR mark manually"
+      ]
+    },
+    {
+      "id": "FR-08", "title": "Attendance correction with admin approval",
+      "type": "feature", "priority": "High", "points": 5, "sprint": "Sprint 2", "owner": "bhuvan",
+      "refs": "FR-08, SR-06, TC-08",
+      "story": "As a Faculty member, I want to fix a wrong mark, and request approval once the edit window has passed, so that records stay accurate and accountable.",
+      "ac": [
+        "Direct edits allowed within the edit window (default 48 h)",
+        "After the window, a correction request with reason needs Admin approval",
+        "Every change logs old value, new value, actor, time and reason"
+      ]
+    },
+    {
+      "id": "FR-10", "title": "Leave / excused absence requests",
+      "type": "feature", "priority": "Medium", "points": 5, "sprint": "Sprint 2", "owner": "bhuvan",
+      "refs": "FR-10, SR-08, TC-10",
+      "story": "As a Student, I want to submit a leave request with a supporting document so that approved absences count as EXCUSED.",
+      "ac": [
+        "Date range at most 30 days in the past; optional PDF/JPG/PNG up to 5 MB (checked by content)",
+        "On approval, ABSENT records in the range become EXCUSED",
+        "Student notified by email and in-app within 5 minutes"
+      ]
+    },
+    {
+      "id": "FR-11", "title": "Low-attendance alerts",
+      "type": "feature", "priority": "Medium", "points": 3, "sprint": "Sprint 2", "owner": "bhuvan",
+      "refs": "FR-11, TC-11",
+      "story": "As a Student, I want to be warned when I drop below the threshold so that I can act before exams.",
+      "ac": [
+        "Alert within 15 minutes of the record that caused the drop (default threshold 75%)",
+        "At most one alert per course every 7 days",
+        "Faculty can list students below threshold for their sections"
+      ]
+    },
+    {
+      "id": "FR-12", "title": "Reports and CSV/PDF export",
+      "type": "feature", "priority": "High", "points": 5, "sprint": "Sprint 2", "owner": "raj",
+      "refs": "FR-12, TC-12",
+      "story": "As Faculty or Admin, I want attendance reports I can export so that eligibility decisions use reliable data.",
+      "ac": [
+        "Reports by section, course, student or department over a date range",
+        "Faculty limited to their own sections; Admin sees all",
+        "Exported CSV/PDF figures match the on-screen report exactly"
+      ]
+    },
+    {
+      "id": "FR-13", "title": "Audit log viewer (read-only)",
+      "type": "feature", "priority": "Medium", "points": 3, "sprint": "Sprint 2", "owner": "merull",
+      "refs": "FR-13, SR-06, TC-17",
+      "story": "As an Admin, I want to search the audit log so that I can trace any sensitive change.",
+      "ac": [
+        "Filter by actor, action, entity and date range; paginated",
+        "DELETE/PATCH on audit entries return 405; DB-level UPDATE is denied"
+      ]
+    },
+    {
+      "id": "FR-14", "title": "Attendance policy configuration",
+      "type": "feature", "priority": "Low", "points": 2, "sprint": "Sprint 2", "owner": "raj",
+      "refs": "FR-14",
+      "story": "As an Admin, I want to configure the threshold, edit window, QR window and holidays so that the system matches institution rules.",
+      "ac": [
+        "Threshold 50–100%, edit window 0–168 h; out-of-range values rejected",
+        "Every configuration change is audit-logged"
+      ]
+    },
+    {
+      "id": "NFR-01", "title": "Performance and burst-load testing",
+      "type": "nfr", "priority": "High", "points": 3, "sprint": "Sprint 2", "owner": "raj",
+      "refs": "NFR-01, NFR-02, TC-13, TC-14",
+      "story": "As a team, we want load tests on the API so that we know it meets the response-time targets, including the QR check-in burst.",
+      "ac": [
+        "At 500 concurrent users, p95 ≤ 2 s and p99 ≤ 4 s",
+        "QR check-in burst test passes the NFR-02 target",
+        "Load-test script and results committed to the repo"
+      ]
+    },
+    {
+      "id": "NFR-03", "title": "Deployment, health checks and backup/restore",
+      "type": "nfr", "priority": "Medium", "points": 3, "sprint": "Sprint 2", "owner": "merull",
+      "refs": "NFR-03, NFR-04",
+      "story": "As an operator, I want health checks, auto-restart and tested backups so that the system recovers from failures.",
+      "ac": [
+        "Containers restart automatically on failure; health endpoint monitored",
+        "Database backup script plus one documented restore drill"
+      ]
+    },
+    {
+      "id": "NFR-05", "title": "Usability, accessibility and browser compatibility",
+      "type": "nfr", "priority": "Medium", "points": 3, "sprint": "Sprint 2", "owner": "raj",
+      "refs": "NFR-05, NFR-06, NFR-07, TC-18",
+      "story": "As any user, I want the app to work on my phone or laptop and with a keyboard so that everyone can use it.",
+      "ac": [
+        "No WCAG 2.1 AA violations from axe-core on key pages",
+        "Marking can be completed keyboard-only",
+        "Layout works at 360 px and 1920 px on Chrome, Firefox, Safari and Edge"
+      ]
+    },
+    {
+      "id": "NFR-09", "title": "Data retention job",
+      "type": "nfr", "priority": "Low", "points": 1, "sprint": "Sprint 2", "owner": "raj",
+      "refs": "NFR-09, SR-06",
+      "story": "As the institution, we want old data purged on schedule so that we comply with the retention policy.",
+      "ac": [
+        "Scheduled job implements the NFR-09 retention rules",
+        "Audit entries kept for 3 years"
+      ]
+    }
+  ]
+}

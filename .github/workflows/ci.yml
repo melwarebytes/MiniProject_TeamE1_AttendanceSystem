@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  server:
+    name: Server (lint + test)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('server/package.json') != '' }}
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: sams
+          POSTGRES_PASSWORD: sams
+          POSTGRES_DB: sams_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sams" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgres://sams:sams@localhost:5432/sams_test
+      REDIS_URL: redis://localhost:6379
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm test --if-present
+
+  client:
+    name: Client (lint + test + build)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('client/package.json') != '' }}
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm test --if-present
+      - run: npm run build --if-present
+
+  pr-checks:
+    name: PR hygiene
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: PR must reference a backlog issue
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if echo "$TITLE $BODY" | grep -Eiq '(closes|fixes|resolves|refs) #[0-9]+'; then
+            echo "Linked issue found."
+          else
+            echo "::error::Add 'Closes #<issue>' to the PR description so it links to the backlog item."
+            exit 1
+          fi
