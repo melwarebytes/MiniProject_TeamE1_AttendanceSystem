@@ -20,7 +20,7 @@ from pathlib import Path
 
 # ---------- EDIT THESE ----------
 OWNER = "melwarebytes"            # repo owner (user or org)
-REPO = "Student-Attendance-Management-System"  # repo name
+REPO = "MiniProject_TeamE1_AttendanceSystem"  # repo name
 USERS = {                         # GitHub usernames; leave "" to skip assigning
     "merull": "melwarebytes",
     "raj": "",                    # no GitHub username configured: not assigned
