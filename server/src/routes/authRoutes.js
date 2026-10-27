@@ -1,53 +1,112 @@
 const express = require('express');
+const { body } = require('express-validator');
+const authService = require('../services/authService');
+const { authenticate } = require('../middleware/auth');
+const { loginLimiter } = require('../middleware/rateLimit');
+const validate = require('../middleware/validate');
+
 const router = express.Router();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const prisma = require('../utils/prisma');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sams_super_secret_jwt_key_pes_e1_2026';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+const COOKIE = 'sams_rt';
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.COOKIE_SECURE !== 'false', // SR-07: Secure, HttpOnly, SameSite=Strict
+  sameSite: 'strict',
+  path: '/api/v1/auth',
+  maxAge: authService.REFRESH_TTL_MS,
+};
 
-// POST /api/v1/auth/login
-router.post('/login', async (req, res, next) => {
+function sendSession(res, { accessToken, refreshToken, user }) {
+  res.cookie(COOKIE, refreshToken, cookieOptions);
+  res.json({
+    message: 'Login successful',
+    token: accessToken, // kept for the existing client code
+    accessToken,
+    expiresIn: 15 * 60,
+    user,
+  });
+}
+
+// POST /api/v1/auth/login — FR-01
+router.post(
+  '/login',
+  loginLimiter,
+  body('email').isEmail().withMessage('A valid email is required').normalizeEmail({ gmail_remove_dots: false }),
+  body('password').isString().notEmpty().withMessage('Password is required'),
+  validate,
+  async (req, res, next) => {
+    try {
+      sendSession(res, await authService.login({ email: req.body.email, password: req.body.password, ip: req.ip }));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/v1/auth/refresh — SR-07 token rotation
+router.post('/refresh', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    sendSession(res, await authService.refresh(req.cookies[COOKIE]));
+  } catch (err) {
+    res.clearCookie(COOKIE, { ...cookieOptions, maxAge: undefined });
+    next(err);
+  }
+});
+
+// POST /api/v1/auth/logout
+router.post('/logout', async (req, res, next) => {
+  try {
+    let actorId = null;
+    const header = req.headers.authorization || '';
+    if (header.startsWith('Bearer ')) {
+      try {
+        actorId = require('jsonwebtoken').decode(header.slice(7))?.id || null;
+      } catch (e) {
+        actorId = null;
+      }
     }
-
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
-
-    if (!user || !user.active) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
-
-    res.json({
-      message: 'Login successful',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        srn: user.srn,
-      },
-    });
+    await authService.logout(req.cookies[COOKIE], actorId, req.ip);
+    res.clearCookie(COOKIE, { ...cookieOptions, maxAge: undefined });
+    res.status(204).end();
   } catch (err) {
     next(err);
   }
 });
+
+// GET /api/v1/auth/me
+router.get('/me', authenticate, (req, res) => res.json({ user: req.user }));
+
+// POST /api/v1/auth/password-reset/request — FR-02 (same answer whether or not the email exists)
+router.post(
+  '/password-reset/request',
+  loginLimiter,
+  body('email').isEmail().withMessage('A valid email is required').normalizeEmail({ gmail_remove_dots: false }),
+  validate,
+  async (req, res, next) => {
+    try {
+      await authService.requestPasswordReset(req.body.email, req.ip);
+      res.status(202).json({ message: 'If that email is registered, a reset link has been sent.' });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/v1/auth/password-reset/confirm — FR-02
+router.post(
+  '/password-reset/confirm',
+  loginLimiter,
+  body('token').isString().notEmpty().withMessage('Reset token is required'),
+  body('password').isString().withMessage('New password is required'),
+  validate,
+  async (req, res, next) => {
+    try {
+      await authService.confirmPasswordReset(req.body.token, req.body.password, req.ip);
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 module.exports = router;
