@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+require('dotenv').config();
 const bcrypt = require('bcryptjs');
-
-const prisma = new PrismaClient();
+const prisma = require('../src/utils/prisma');
 
 async function main() {
   console.log('Seeding SAMS Database...');
@@ -9,7 +8,7 @@ async function main() {
   // 1. Create Users
   const passwordHash = await bcrypt.hash('Password123!', 10);
 
-  const admin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'admin@pes.edu' },
     update: {},
     create: {
@@ -70,7 +69,7 @@ async function main() {
     },
   });
 
-  const dbCourse = await prisma.course.upsert({
+  await prisma.course.upsert({
     where: { code: 'UE24CS302' },
     update: {},
     create: {

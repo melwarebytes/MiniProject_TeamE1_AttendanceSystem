@@ -24,8 +24,11 @@ jobs:
         image: redis:7
         ports: ["6379:6379"]
     env:
-      DATABASE_URL: postgres://sams:sams@localhost:5432/sams_test
+      DATABASE_URL: postgresql://sams:sams@localhost:5432/sams_test?schema=public
       REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-jwt-secret
+      QR_HMAC_SECRET: ci-only-qr-secret
+      JWT_EXPIRES_IN: 15m
     defaults:
       run:
         working-directory: server
@@ -40,6 +43,9 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
         if: hashFiles('server/package.json') != ''
+      - name: Generate Prisma client and create the test schema
+        if: hashFiles('server/package.json') != ''
+        run: npx prisma generate && npx prisma db push
       - run: npm run lint --if-present
         if: hashFiles('server/package.json') != ''
       - run: npm test --if-present
