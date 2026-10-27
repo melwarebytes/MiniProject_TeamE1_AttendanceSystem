@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -63,6 +62,10 @@ model User {
   passwordHash String
   role         Role
   active       Boolean  @default(true)
+  department   String?
+  // FR-01 / SR-04: account lockout after repeated failed logins
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -74,8 +77,43 @@ model User {
   leaveRequests    LeaveRequest[]
   alertsReceived   AttendanceAlert[]
   auditLogs        AuditLog[]
+  refreshTokens    RefreshToken[]
+  resetTokens      PasswordResetToken[]
 
   @@map("users")
+}
+
+// ─── Auth tokens (FR-01, FR-02, SR-07) ────────────────────────────────────────
+
+// Refresh tokens are opaque random strings; only their SHA-256 hash is stored.
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// Single-use password reset links, valid for 15 minutes.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 // ─── Courses & Sections ───────────────────────────────────────────────────────
@@ -293,6 +331,7 @@ model AuditLog {
   entityId  String
   oldValue  Json?
   newValue  Json?
+  ip        String?
   createdAt DateTime @default(now())
 
   actor User? @relation(fields: [actorId], references: [id])

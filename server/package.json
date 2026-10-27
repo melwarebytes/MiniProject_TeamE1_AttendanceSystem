@@ -1,19 +1,21 @@
 {
   "name": "sams-server",
   "version": "1.0.0",
-  "description": "SAMS — Student Attendance Management System API",
+  "description": "SAMS \u2014 Student Attendance Management System API",
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "lint": "eslint src --ext .js",
+    "lint": "eslint src prisma --ext .js",
     "test": "jest --runInBand --forceExit",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "generate": "prisma generate"
+    "generate": "prisma generate",
+    "seed": "node prisma/seed.js",
+    "db:push": "prisma db push"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.0",
+    "@prisma/client": "^7.10.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -28,22 +30,29 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.7",
     "uuid": "^9.0.0",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "@prisma/adapter-pg": "^7.10.1",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.8",
     "eslint": "^8.54.0",
     "jest": "^29.7.0",
     "nodemon": "^3.0.2",
-    "prisma": "^5.7.0",
+    "prisma": "^7.10.1",
     "supertest": "^6.3.3"
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFilesAfterFramework": [],
-    "testMatch": ["**/__tests__/**/*.test.js"]
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ],
+    "testTimeout": 20000,
+    "setupFiles": [
+      "dotenv/config"
+    ]
   },
-  "prisma": {
-    "seed": "node prisma/seed.js"
+  "engines": {
+    "node": ">=20.19"
   }
 }
