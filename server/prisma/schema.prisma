@@ -24,6 +24,12 @@ enum AttendanceStatus {
   EXCUSED
 }
 
+enum AttendanceSource {
+  MANUAL
+  QR
+  LEAVE
+}
+
 enum SessionStatus {
   SCHEDULED
   CANCELLED
@@ -220,7 +226,6 @@ model Session {
 
   section          Section            @relation(fields: [sectionId], references: [id])
   attendanceRecords AttendanceRecord[]
-  qrTokens         QrToken[]
 
   @@map("sessions")
 }
@@ -232,6 +237,7 @@ model AttendanceRecord {
   enrollmentId String
   sessionId    String
   status       AttendanceStatus @default(PRESENT)
+  source       AttendanceSource @default(MANUAL) // FR-07: how the mark was made
   markedById   String?          // faculty user id
   markedAt     DateTime?
   version      Int              @default(0) // optimistic locking
@@ -245,21 +251,6 @@ model AttendanceRecord {
 
   @@unique([enrollmentId, sessionId])
   @@map("attendance_records")
-}
-
-// ─── QR Tokens (FR-07 — managed by Merull) ────────────────────────────────────
-
-model QrToken {
-  id        String   @id @default(uuid())
-  sessionId String
-  token     String   @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-
-  session Session @relation(fields: [sessionId], references: [id])
-
-  @@map("qr_tokens")
 }
 
 // ─── Corrections (FR-08) ──────────────────────────────────────────────────────
