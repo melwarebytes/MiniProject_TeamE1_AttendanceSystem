@@ -2,7 +2,10 @@ const jwt = require('jsonwebtoken');
 const { app, prisma, request, PASSWORD, createUser, refreshCookie } = require('./helpers');
 const authService = require('../services/authService');
 
-afterAll(() => prisma.$disconnect());
+afterAll(async () => {
+  await prisma.$disconnect();
+  await require('../utils/redis').quit();
+});
 
 describe('[FR-01] Authentication', () => {
   test('TC-01: valid credentials return a 15-minute token carrying the role, and are audit-logged', async () => {

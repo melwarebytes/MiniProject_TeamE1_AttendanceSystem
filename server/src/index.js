@@ -10,12 +10,17 @@ const server = app.listen(PORT, () => {
   initAttendanceAlertJob();
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  server.close(() => {
+// Graceful shutdown: stop taking requests, then close database and Redis connections
+function shutdown(signal) {
+  logger.info(`${signal} received, shutting down gracefully`);
+  server.close(async () => {
+    await Promise.allSettled([require('./utils/prisma').$disconnect(), require('./utils/redis').quit()]);
     logger.info('Process terminated');
+    process.exit(0);
   });
-});
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 module.exports = server;

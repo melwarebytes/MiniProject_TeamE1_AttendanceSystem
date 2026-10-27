@@ -11,6 +11,10 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const correctionRoutes = require('./routes/correctionRoutes');
 const leaveRoutes = require('./routes/leaveRoutes');
 const alertRoutes = require('./routes/alertRoutes');
+const qrRoutes = require('./routes/qrRoutes');
+const auditRoutes = require('./routes/auditRoutes');
+const prisma = require('./utils/prisma');
+const redis = require('./utils/redis');
 const logger = require('./utils/logger');
 const { apiLimiter } = require('./middleware/rateLimit');
 
@@ -35,10 +39,22 @@ app.use('/api/', apiLimiter);
 // Static uploads directory
 app.use('/uploads', express.static(path.resolve(process.env.UPLOAD_DIR || 'uploads')));
 
-// Health check endpoint
-app.get('/api/v1/health', (req, res) => {
-  res.json({
-    status: 'ok',
+// Health check endpoint (NFR-03): 200 when the database and Redis respond, 503 otherwise.
+// Docker's health check and the uptime monitor both call this.
+app.get('/api/v1/health', async (req, res) => {
+  const check = async (fn) => {
+    try {
+      await Promise.race([fn(), new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))]);
+      return 'ok';
+    } catch (e) {
+      return 'down';
+    }
+  };
+  const [database, cache] = await Promise.all([check(() => prisma.$queryRaw`SELECT 1`), check(() => redis.ping())]);
+  const healthy = database === 'ok' && cache === 'ok';
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
+    checks: { database, redis: cache },
     timestamp: new Date().toISOString(),
     service: 'SAMS API',
     uptime: process.uptime(),
@@ -53,6 +69,8 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/corrections', correctionRoutes);
 app.use('/api/v1/leave', leaveRoutes);
 app.use('/api/v1/alerts', alertRoutes);
+app.use('/api/v1', qrRoutes);
+app.use('/api/v1/audit-logs', auditRoutes);
 
 // 404 Not Found handler
 app.use((req, res) => {

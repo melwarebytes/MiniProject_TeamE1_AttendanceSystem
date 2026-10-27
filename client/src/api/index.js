@@ -81,6 +81,17 @@ export const api = {
   confirmPasswordReset: (token, password) =>
     request('/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify({ token, password }) }),
 
+  // FR-07: QR check-in
+  qrToday: () => request('/qr/today'),
+  openQrWindow: (sessionId, minutes) => request(`/sessions/${sessionId}/qr`, { method: 'POST', body: JSON.stringify({ minutes }) }),
+  qrStatus: (sessionId) => request(`/sessions/${sessionId}/qr`),
+  qrToken: (sessionId) => request(`/sessions/${sessionId}/qr/token`),
+  closeQrWindow: (sessionId) => request(`/sessions/${sessionId}/qr`, { method: 'DELETE' }),
+  checkIn: (token) => request('/checkins', { method: 'POST', body: JSON.stringify({ token }) }),
+
+  // FR-13: Audit log
+  auditLogs: (params = '') => request(`/audit-logs?${params}`),
+
   // FR-05: Sessions
   generateSessions: (sectionId) => request('/sessions/generate', { method: 'POST', body: JSON.stringify({ sectionId }) }),
   addExtraSession: (payload) => request('/sessions/extra', { method: 'POST', body: JSON.stringify(payload) }),
