@@ -1,0 +1,301 @@
+// SAMS — Prisma Schema
+// Covers all modules including Bhuvan's: FR-05, FR-06, FR-08, FR-09, FR-10, FR-11
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  FACULTY
+  STUDENT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  CANCELLED
+  EXTRA
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DayOfWeek {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  srn          String?  @unique
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  taughtSections   SectionFaculty[]
+  enrollments      Enrollment[]
+  attendanceMarked AttendanceRecord[] @relation("MarkedBy")
+  corrections      CorrectionRequest[]
+  leaveRequests    LeaveRequest[]
+  alertsReceived   AttendanceAlert[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+// ─── Courses & Sections ───────────────────────────────────────────────────────
+
+model Course {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sections Section[]
+
+  @@map("courses")
+}
+
+model Section {
+  id              String   @id @default(uuid())
+  courseId        String
+  name            String   // e.g. "A", "B"
+  semesterStart   DateTime
+  semesterEnd     DateTime
+  attendanceThreshold Float @default(75.0) // FR-14: configurable
+  editWindowHours Int     @default(48)     // FR-14: correction edit window
+  qrWindowMinutes Int     @default(15)     // FR-14: QR check-in window
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  course       Course           @relation(fields: [courseId], references: [id])
+  faculty      SectionFaculty[]
+  timetable    TimetableSlot[]
+  sessions     Session[]
+  enrollments  Enrollment[]
+  holidays     Holiday[]
+
+  @@unique([courseId, name])
+  @@map("sections")
+}
+
+model SectionFaculty {
+  id        String   @id @default(uuid())
+  sectionId String
+  userId    String
+  assignedAt DateTime @default(now())
+
+  section Section @relation(fields: [sectionId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([sectionId, userId])
+  @@map("section_faculty")
+}
+
+model TimetableSlot {
+  id        String    @id @default(uuid())
+  sectionId String
+  dayOfWeek DayOfWeek
+  startTime String    // "HH:MM" in IST
+  endTime   String    // "HH:MM"
+
+  section Section @relation(fields: [sectionId], references: [id])
+
+  @@map("timetable_slots")
+}
+
+model Holiday {
+  id        String   @id @default(uuid())
+  sectionId String?  // null = institution-wide
+  date      DateTime
+  reason    String?
+
+  section Section? @relation(fields: [sectionId], references: [id])
+
+  @@map("holidays")
+}
+
+model Enrollment {
+  id        String   @id @default(uuid())
+  sectionId String
+  userId    String   // STUDENT
+  enrolledAt DateTime @default(now())
+
+  section          Section            @relation(fields: [sectionId], references: [id])
+  user             User               @relation(fields: [userId], references: [id])
+  attendanceRecords AttendanceRecord[]
+
+  @@unique([sectionId, userId])
+  @@map("enrollments")
+}
+
+// ─── Sessions (FR-05) ─────────────────────────────────────────────────────────
+
+model Session {
+  id          String        @id @default(uuid())
+  sectionId   String
+  date        DateTime      // date of the class
+  startTime   String        // "HH:MM"
+  endTime     String        // "HH:MM"
+  status      SessionStatus @default(SCHEDULED)
+  cancelReason String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  version     Int           @default(0) // optimistic locking
+
+  section          Section            @relation(fields: [sectionId], references: [id])
+  attendanceRecords AttendanceRecord[]
+  qrTokens         QrToken[]
+
+  @@map("sessions")
+}
+
+// ─── Attendance (FR-06) ───────────────────────────────────────────────────────
+
+model AttendanceRecord {
+  id           String           @id @default(uuid())
+  enrollmentId String
+  sessionId    String
+  status       AttendanceStatus @default(PRESENT)
+  markedById   String?          // faculty user id
+  markedAt     DateTime?
+  version      Int              @default(0) // optimistic locking
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  enrollment       Enrollment         @relation(fields: [enrollmentId], references: [id])
+  session          Session            @relation(fields: [sessionId], references: [id])
+  markedBy         User?              @relation("MarkedBy", fields: [markedById], references: [id])
+  correctionRequests CorrectionRequest[]
+
+  @@unique([enrollmentId, sessionId])
+  @@map("attendance_records")
+}
+
+// ─── QR Tokens (FR-07 — managed by Merull) ────────────────────────────────────
+
+model QrToken {
+  id        String   @id @default(uuid())
+  sessionId String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id])
+
+  @@map("qr_tokens")
+}
+
+// ─── Corrections (FR-08) ──────────────────────────────────────────────────────
+
+model CorrectionRequest {
+  id                 String           @id @default(uuid())
+  attendanceRecordId String
+  requestedById      String           // faculty
+  oldStatus          AttendanceStatus
+  newStatus          AttendanceStatus
+  reason             String
+  status             CorrectionStatus @default(PENDING)
+  reviewedAt         DateTime?
+  reviewNote         String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  attendanceRecord AttendanceRecord @relation(fields: [attendanceRecordId], references: [id])
+  requestedBy      User             @relation(fields: [requestedById], references: [id])
+
+  @@map("correction_requests")
+}
+
+// ─── Leave Requests (FR-10) ───────────────────────────────────────────────────
+
+model LeaveRequest {
+  id           String      @id @default(uuid())
+  userId       String      // student
+  sectionId    String
+  startDate    DateTime
+  endDate      DateTime
+  reason       String
+  documentPath String?     // uploaded file path
+  documentMime String?
+  status       LeaveStatus @default(PENDING)
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user    User   @relation(fields: [userId], references: [id])
+
+  @@map("leave_requests")
+}
+
+// ─── Alerts (FR-11) ───────────────────────────────────────────────────────────
+
+model AttendanceAlert {
+  id        String   @id @default(uuid())
+  userId    String   // student
+  sectionId String
+  percentage Float
+  threshold  Float
+  sentAt    DateTime @default(now())
+  readAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("attendance_alerts")
+}
+
+// ─── Audit Log (FR-13) ────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  action    String   // e.g. "ATTENDANCE_MARKED", "CORRECTION_APPROVED"
+  entity    String   // table name
+  entityId  String
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@map("audit_logs")
+}
