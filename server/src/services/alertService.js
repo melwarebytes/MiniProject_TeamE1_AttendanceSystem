@@ -3,7 +3,6 @@ const { calculateMetrics } = require('./dashboardService');
 const { sendEmail } = require('../utils/mailer');
 const { recordAuditLog } = require('./auditService');
 const { isFacultyAssigned } = require('./attendanceService');
-const logger = require('../utils/logger');
 
 /**
  * FR-11: Check and trigger low attendance alerts for a section or specific student
