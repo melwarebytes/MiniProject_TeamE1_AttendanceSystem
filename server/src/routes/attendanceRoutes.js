@@ -35,7 +35,7 @@ router.post(
         sessionId: req.params.sessionId,
         records,
         user: req.user,
-        bypassTimeWindow: !!bypassTimeWindow,
+        bypassTimeWindow: req.user.role === 'ADMIN' && !!bypassTimeWindow,
       });
 
       // Asynchronously trigger check for low attendance alerts (FR-11)

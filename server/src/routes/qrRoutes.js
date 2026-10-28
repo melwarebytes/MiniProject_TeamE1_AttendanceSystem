@@ -18,9 +18,9 @@ router.post(
   authenticate,
   authorize('FACULTY', 'ADMIN'),
   sessionId,
-  body('minutes').isInt({ min: 1, max: 10 }).withMessage('minutes must be between 1 and 10'),
+  body('minutes').optional().isInt({ min: 1, max: 10 }).withMessage('minutes must be between 1 and 10'),
   validate,
-  wrap(async (req, res) => res.status(201).json(await qrService.openWindow(req.params.id, Number(req.body.minutes), req.user, req.ip)))
+  wrap(async (req, res) => res.status(201).json(await qrService.openWindow(req.params.id, req.body.minutes, req.user, req.ip)))
 );
 
 // GET /api/v1/sessions/:id/qr — window status and check-in count

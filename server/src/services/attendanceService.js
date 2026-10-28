@@ -1,4 +1,6 @@
 const prisma = require('../utils/prisma');
+const { eligibleForSession } = require('./membershipService');
+const { badRequest } = require('../utils/errors');
 const { recordAuditLog } = require('./auditService');
 
 /**
@@ -67,6 +69,7 @@ async function getSessionRoster(sessionId, user) {
   const enrollments = await prisma.enrollment.findMany({
     where: { sectionId: session.sectionId },
     include: {
+      periods: true,
       user: {
         select: { id: true, name: true, srn: true, email: true },
       },
@@ -84,7 +87,7 @@ async function getSessionRoster(sessionId, user) {
   });
 
   // Construct roster with default PRESENT
-  const roster = enrollments.map((enr) => {
+  const roster = enrollments.filter(e => eligibleForSession(e, session)).map((enr) => {
     const existing = existingRecordsMap.get(enr.id);
     return {
       enrollmentId: enr.id,
@@ -183,6 +186,12 @@ async function submitAttendanceRoster({ sessionId, records, user, bypassTimeWind
   // Check marking time window unless bypassed by test or admin
   if (!bypassTimeWindow && user.role !== 'ADMIN') {
     validateMarkingWindow(session.date, session.startTime);
+  }
+
+  const enrolled = await prisma.enrollment.findMany({ where: { sectionId: session.sectionId }, include: { periods: true } });
+  const eligible = new Set(enrolled.filter(e => eligibleForSession(e, session)).map(e => e.id));
+  if (records.length > 300 || new Set(records.map(r => r.enrollmentId)).size !== records.length || records.some(r => !eligible.has(r.enrollmentId) || !['PRESENT', 'LATE', 'ABSENT'].includes(r.status))) {
+    throw badRequest('Records must contain unique eligible enrolments and PRESENT, LATE or ABSENT statuses.');
   }
 
   // Atomic transaction to save all records + audit log

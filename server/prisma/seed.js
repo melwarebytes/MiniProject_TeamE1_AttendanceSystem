@@ -4,9 +4,10 @@ const prisma = require('../src/utils/prisma');
 
 async function main() {
   console.log('Seeding SAMS Database...');
+  await prisma.policy.upsert({ where: { id: 'institution' }, create: {}, update: {} });
 
   // 1. Create Users
-  const passwordHash = await bcrypt.hash('Password123!', 10);
+  const passwordHash = await bcrypt.hash('Password123!', 12);
 
   await prisma.user.upsert({
     where: { email: 'admin@pes.edu' },
@@ -85,7 +86,8 @@ async function main() {
 
   const sectionA = await prisma.section.upsert({
     where: {
-      courseId_name: {
+      courseId_name_semesterStart: {
+        semesterStart,
         courseId: seCourse.id,
         name: 'A',
       },

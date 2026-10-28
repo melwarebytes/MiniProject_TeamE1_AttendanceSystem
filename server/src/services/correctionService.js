@@ -46,7 +46,7 @@ async function correctAttendanceDirectly({ attendanceRecordId, newStatus, reason
     }
 
     // Check edit window
-    const windowHours = record.session.section.editWindowHours || 48;
+    const windowHours = record.session.section.editWindowHours ?? 48;
     const allowed = isWithinEditWindow(record.session.date, record.session.endTime, windowHours);
     if (!allowed) {
       const err = new Error(

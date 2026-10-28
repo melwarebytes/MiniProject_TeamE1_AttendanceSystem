@@ -1,3 +1,7 @@
+import UserManagement from './pages/UserManagement';
+import CourseManagement from './pages/CourseManagement';
+import PolicySettings from './pages/PolicySettings';
+import Reports from './pages/Reports';
 import React from 'react';
 import StudentDashboard from './pages/StudentDashboard';
 import AttendanceMarking from './pages/AttendanceMarking';
@@ -12,6 +16,10 @@ import AuditLog from './pages/AuditLog';
 // One entry per screen. `roles` controls who sees it in the menu and who may open it.
 // The first entry a role can see is that role's landing page.
 export const NAV = [
+  { path: '/users', label: 'Users', roles: ['ADMIN'], render: () => <UserManagement /> },
+  { path: '/courses', label: 'Courses & Enrolments', roles: ['ADMIN'], render: () => <CourseManagement /> },
+  { path: '/reports', label: 'Reports', roles: ['ADMIN', 'FACULTY'], render: () => <Reports /> },
+  { path: '/policies', label: 'Policy', roles: ['ADMIN'], render: () => <PolicySettings /> },
   { path: '/dashboard', label: 'My Attendance', roles: ['STUDENT'], render: () => <StudentDashboard /> },
   { path: '/check-in', label: 'Check In', roles: ['STUDENT'], render: () => <QrCheckIn /> },
   { path: '/mark', label: 'Mark Attendance', roles: ['FACULTY'], render: () => <AttendanceMarking /> },

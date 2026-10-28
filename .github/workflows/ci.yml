@@ -1,14 +1,13 @@
 name: CI
-
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix/**']
   pull_request:
     branches: [main]
-
+  workflow_dispatch:
 jobs:
   server:
-    name: Server (lint + test)
+    name: Server (migrations, permissions, lint, tests, load)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -17,64 +16,70 @@ jobs:
           POSTGRES_USER: sams
           POSTGRES_PASSWORD: sams
           POSTGRES_DB: sams_test
-        ports: ["5432:5432"]
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U sams" --health-interval 5s --health-timeout 5s --health-retries 10
       redis:
         image: redis:7
-        ports: ["6379:6379"]
+        ports: ['6379:6379']
     env:
-      DATABASE_URL: postgresql://sams:sams@localhost:5432/sams_test?schema=public
+      DATABASE_URL: postgresql://sams:sams@localhost:5432/sams_test
+      TEST_APP_DATABASE_URL: postgresql://sams_app:ci-app-password-only@localhost:5432/sams_test
+      APP_DB_PASSWORD: ci-app-password-only
+      RETENTION_DB_PASSWORD: ci-retention-password-only
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-only-jwt-secret
       QR_HMAC_SECRET: ci-only-qr-secret
       JWT_EXPIRES_IN: 15m
+      NODE_ENV: test
     defaults:
       run:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
-        if: hashFiles('server/package.json') != ''
       - uses: actions/setup-node@v4
-        if: hashFiles('server/package.json') != ''
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci
-        if: hashFiles('server/package.json') != ''
-      - name: Generate Prisma client and create the test schema
-        if: hashFiles('server/package.json') != ''
-        run: npx prisma generate && npx prisma db push
-      - run: npm run lint --if-present
-        if: hashFiles('server/package.json') != ''
-      - run: npm test --if-present
-        if: hashFiles('server/package.json') != ''
-
+      - name: Deploy versioned schema and provision restricted roles
+        run: npx prisma generate && npm run migrate:deploy && npm run db:roles
+      - run: npm run lint
+      - run: npm test
+      - name: Seed is repeatable
+        run: npm run seed && npm run seed
+      - name: Measure API and QR burst targets
+        run: npm run test:load
+        env:
+          LOAD_TEST_ALLOW_SEED: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-results
+          path: server/performance/results/*.json
   client:
-    name: Client (lint + test + build)
+    name: Client (build, accessibility, keyboard, browsers)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: client
     steps:
       - uses: actions/checkout@v4
-        if: hashFiles('client/package.json') != ''
       - uses: actions/setup-node@v4
-        if: hashFiles('client/package.json') != ''
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
-        if: hashFiles('client/package.json') != ''
-      - run: npm run lint --if-present
-        if: hashFiles('client/package.json') != ''
-      - run: npm test --if-present
-        if: hashFiles('client/package.json') != ''
-      - run: npm run build --if-present
-        if: hashFiles('client/package.json') != ''
-
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-results
+          path: client/playwright-report/
   pr-checks:
     name: PR hygiene
     runs-on: ubuntu-latest
@@ -88,6 +93,6 @@ jobs:
           if echo "$TITLE $BODY" | grep -Eiq '(closes|fixes|resolves|refs) #[0-9]+'; then
             echo "Linked issue found."
           else
-            echo "::error::Add 'Closes #<issue>' to the PR description so it links to the backlog item."
+            echo "::error::Add Closes or Refs followed by a backlog issue number."
             exit 1
           fi

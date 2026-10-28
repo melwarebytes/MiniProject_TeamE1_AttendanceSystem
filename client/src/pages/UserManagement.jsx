@@ -1,0 +1,28 @@
+import React, { useEffect, useState } from 'react';
+import { api } from '../api';
+import { Field, Notice, Panel, inputClass, buttonClass, send } from '../components/AdminUI';
+const empty = { name: '', email: '', srn: '', role: 'STUDENT', department: '', password: '' };
+export default function UserManagement() {
+  const [users, setUsers] = useState([]), [form, setForm] = useState(empty), [editing, setEditing] = useState(null);
+  const [error, setError] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(1), [total, setTotal] = useState(0), [search, setSearch] = useState(''), [query, setQuery] = useState(''), [report, setReport] = useState(null);
+  async function load() { const r = await api.request(`/users?page=${page}&q=${encodeURIComponent(query)}`); setUsers(r.data); setTotal(r.total); }
+  useEffect(() => { load().catch(e => setError(e.message)); }, [page, query]);
+  async function run(fn) { setBusy(true); setError(''); setMessage(''); try { await fn(); await load(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  async function save(e) { e.preventDefault(); await run(async () => { const data = { ...form }; if (!data.password) delete data.password; await send(editing ? `/users/${editing}` : '/users', editing ? 'PATCH' : 'POST', data); setEditing(null); setForm(empty); setMessage('Account saved. Accounts without an initial password can use Forgot password.'); }); }
+  function edit(user) { setEditing(user.id); setForm({ name: user.name, email: user.email, srn: user.srn || '', role: user.role, department: user.department || '', password: '' }); document.getElementById('user-name').focus(); }
+  return <div className="max-w-7xl mx-auto px-4 space-y-6"><h1 className="text-2xl font-bold">User management</h1><Notice error={error} message={message} />
+    <Panel title={editing ? 'Edit account' : 'Create account'}><form onSubmit={save} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {['name', 'email', 'srn', 'department', 'password'].map(key => <Field key={key} label={{ name:'Name',email:'Institutional email',srn:'Student SRN',department:'Department',password:'Initial / replacement password (optional)' }[key]}><input id={`user-${key}`} className={inputClass} type={key === 'password' ? 'password' : key === 'email' ? 'email' : 'text'} autoComplete={key === 'password' ? 'new-password' : 'off'} required={['name','email'].includes(key) || key === 'srn' && form.role === 'STUDENT'} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} /></Field>)}
+      <Field label="Role"><select className={inputClass} value={form.role} disabled={!!editing} onChange={e => setForm({ ...form, role: e.target.value })}><option>STUDENT</option><option>FACULTY</option></select></Field>
+      <div className="flex gap-3"><button className={buttonClass} disabled={busy}>{busy ? 'Saving…' : 'Save account'}</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm(empty); }}>Cancel edit</button>}</div>
+    </form></Panel>
+    <Panel title="Import or update accounts by CSV"><p className="text-sm text-gray-700">Up to 5,000 rows. Headers: name,email,role,srn,department. Optional: password,active (true/false). Existing email addresses are updated; invalid rows are reported individually.</p>
+      <form onSubmit={e => { e.preventDefault(); const data = new FormData(e.currentTarget); run(async () => { const r = await api.request('/users/import', { method:'POST', body:data }); setReport(r); setMessage(`Imported ${r.imported}; rejected ${r.rejected}.`); }); }} className="flex flex-wrap gap-4 items-end"><Field label="CSV file"><input className={inputClass} name="file" type="file" accept=".csv,text/csv" required /></Field><button className={buttonClass} disabled={busy}>Import CSV</button></form>
+      {report?.errors.length > 0 && <ul className="max-h-64 overflow-auto text-sm" aria-label="Import errors">{report.errors.map(e => <li key={e.row}>Row {e.row}: {e.reason}</li>)}</ul>}
+    </Panel>
+    <Panel title="Accounts"><form className="flex gap-3" onSubmit={e => { e.preventDefault(); setPage(1); setQuery(search); }}><Field label="Search name, email or SRN"><input className={inputClass} value={search} onChange={e => setSearch(e.target.value)} /></Field><button className={buttonClass}>Search</button></form>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">User accounts</caption><thead><tr>{['Name','Email','Role','State','Actions'].map(x => <th key={x} scope="col" className="p-2">{x}</th>)}</tr></thead><tbody>{users.map(u => <tr key={u.id} className="border-t"><td className="p-2">{u.name}</td><td className="p-2">{u.email}</td><td className="p-2">{u.role}</td><td className="p-2">{u.active ? 'Active' : 'Inactive'}</td><td className="p-2">{u.role !== 'ADMIN' && <div className="flex gap-4"><button className="text-indigo-800 underline" aria-label={`Edit ${u.name}`} onClick={() => edit(u)}>Edit</button><button disabled={busy} className="text-indigo-800 underline" aria-label={`${u.active ? 'Deactivate' : 'Reactivate'} ${u.name}`} onClick={() => run(async () => { await send(`/users/${u.id}`, 'PATCH', { active: !u.active }); setMessage('Account status updated.'); })}>{u.active ? 'Deactivate' : 'Reactivate'}</button></div>}</td></tr>)}</tbody></table></div>
+      <div className="flex gap-4 items-center"><button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button><span>Page {page} · {total} accounts</span><button disabled={page * 20 >= total} onClick={() => setPage(page + 1)}>Next</button></div>
+    </Panel></div>;
+}

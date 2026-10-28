@@ -71,11 +71,11 @@ export default function AttendanceMarking() {
       setMessage(null);
 
       const result = await api.submitRoster(selectedSessionId, records, false);
+      await fetchRoster(selectedSessionId);
       setMessage(
         `Attendance successfully submitted! Present: ${result.summary.PRESENT}, Absent: ${result.summary.ABSENT}, Late: ${result.summary.LATE}`
       );
-      // Refresh roster data
-      await fetchRoster(selectedSessionId);
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -93,15 +93,15 @@ export default function AttendanceMarking() {
             Defaulted to PRESENT. Marking allowed from session start until 23:59 same day.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-semibold text-gray-600 uppercase">Select Session:</label>
-          <select
+        <div className="flex flex-col sm:flex-row min-w-0 gap-3">
+          <label htmlFor="session-selector" className="text-xs font-semibold text-gray-600 uppercase">Select Session:</label>
+          <select id="session-selector"
             value={selectedSessionId}
             onChange={(e) => {
               setSelectedSessionId(e.target.value);
               fetchRoster(e.target.value);
             }}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="min-w-0 max-w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           >
             {sessions.map((s) => (
               <option key={s.id} value={s.id}>
@@ -113,13 +113,13 @@ export default function AttendanceMarking() {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-4 rounded-lg text-sm border-l-4 border-red-500">
+        <div role="alert" className="bg-red-50 text-red-700 p-4 rounded-lg text-sm border-l-4 border-red-500">
           {error}
         </div>
       )}
 
       {message && (
-        <div className="bg-emerald-50 text-emerald-800 p-4 rounded-lg text-sm border-l-4 border-emerald-500">
+        <div role="status" className="bg-emerald-50 text-emerald-800 p-4 rounded-lg text-sm border-l-4 border-emerald-500">
           {message}
         </div>
       )}
@@ -160,17 +160,18 @@ export default function AttendanceMarking() {
 
                     return (
                       <tr key={student.enrollmentId} className="hover:bg-gray-50">
-                        <td className="py-3 px-4 text-gray-400 text-xs">{idx + 1}</td>
+                        <td className="py-3 px-4 text-gray-600 text-xs">{idx + 1}</td>
                         <td className="py-3 px-4 font-mono text-xs font-semibold text-gray-700">{student.srn || 'N/A'}</td>
                         <td className="py-3 px-4 font-medium text-gray-800">{student.studentName}</td>
                         <td className="py-3 px-4">
-                          <div className="inline-flex rounded-md shadow-sm" role="group">
+                          <div className="inline-flex rounded-md shadow-sm" role="group" aria-label={`Attendance for ${student.studentName}`}>
                             <button
                               type="button"
+                              aria-pressed={currentStatus === 'PRESENT'}
                               onClick={() => handleStatusChange(student.enrollmentId, 'PRESENT')}
                               className={`px-3 py-1 text-xs font-semibold rounded-l-md border ${
                                 currentStatus === 'PRESENT'
-                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  ? 'bg-emerald-700 text-white border-emerald-700'
                                   : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
                               }`}
                             >
@@ -178,10 +179,11 @@ export default function AttendanceMarking() {
                             </button>
                             <button
                               type="button"
+                              aria-pressed={currentStatus === 'LATE'}
                               onClick={() => handleStatusChange(student.enrollmentId, 'LATE')}
                               className={`px-3 py-1 text-xs font-semibold border-t border-b ${
                                 currentStatus === 'LATE'
-                                  ? 'bg-amber-500 text-white border-amber-500'
+                                  ? 'bg-amber-800 text-white border-amber-800'
                                   : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
                               }`}
                             >
@@ -189,6 +191,7 @@ export default function AttendanceMarking() {
                             </button>
                             <button
                               type="button"
+                              aria-pressed={currentStatus === 'ABSENT'}
                               onClick={() => handleStatusChange(student.enrollmentId, 'ABSENT')}
                               className={`px-3 py-1 text-xs font-semibold rounded-r-md border ${
                                 currentStatus === 'ABSENT'

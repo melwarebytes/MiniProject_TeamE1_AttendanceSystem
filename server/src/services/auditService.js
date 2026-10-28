@@ -30,7 +30,8 @@ async function recordAuditLog({
     return log;
   } catch (error) {
     logger.error('Failed to create audit log entry:', error);
-    // Audit failures should not crash main transaction unless critical
+    // A transactional change must never commit without its audit entry.
+    if (tx !== prisma) throw error;
     return null;
   }
 }

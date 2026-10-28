@@ -49,6 +49,8 @@ describe('SAMS Bhuvan Modules — Core Logic & Unit Tests', () => {
   });
 
   describe('[FR-08] Edit Window Calculation for Direct Corrections', () => {
+    beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(new Date('2026-10-28T12:00:00Z')); });
+    afterEach(() => jest.useRealTimers());
     test('allows direct edit if within window (e.g. 24 hours elapsed for 48h window)', () => {
       const sessionDate = new Date();
       sessionDate.setHours(sessionDate.getHours() - 24);
