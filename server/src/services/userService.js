@@ -92,7 +92,7 @@ async function importUsers(buffer, actor, ip) {
       trim: true,
       info: true,
       relax_column_count: true,
-      max_record_size: 4096,
+      max_record_size: 5 * 1024 * 1024,
     });
   } catch (_error) {
     throw badRequest('Malformed CSV. Check quoting and delimiters.');

@@ -258,3 +258,60 @@ test('runtime role can append/read audit but cannot update, delete or truncate i
     await db.end();
   }
 });
+
+test('CSV rejects an oversized field individually without dropping valid rows', async () => {
+  const good = profile();
+  const csv = `name,email,role,srn\n${'x'.repeat(4200)},invalid@pes.edu,STUDENT,invalid\nGood,${good.email},STUDENT,${good.srn}\n`;
+  const result = await api('post', '/users/import').attach('file', Buffer.from(csv), 'users.csv');
+  expect(result.status).toBe(200);
+  expect(result.body).toMatchObject({ imported: 1, rejected: 1 });
+  expect(result.body.errors[0].row).toBe(2);
+});
+
+test('removing a faculty assignment revokes existing export snapshots', async () => {
+  const f = await asUser('FACULTY');
+  await prisma.sectionFaculty.create({ data: { sectionId: section.id, userId: f.user.id } });
+  const report = await api('get', `/reports?type=section&from=2026-01-01&to=2026-12-31&sectionId=${section.id}`, f.token);
+  expect(report.status).toBe(200);
+  await prisma.sectionFaculty.delete({ where: { sectionId_userId: { sectionId: section.id, userId: f.user.id } } });
+  expect((await api('get', `/reports?format=csv&snapshot=${report.body.snapshot}`, f.token)).status).toBe(403);
+});
+
+test('retention login cannot delete audit entries inside the three-year window', async () => {
+  const url = new URL(process.env.TEST_APP_DATABASE_URL);
+  url.username = 'sams_retention'; url.password = process.env.RETENTION_DB_PASSWORD;
+  const db = new Client({ connectionString: url.toString() }); await db.connect();
+  try {
+    const id = uid();
+    await db.query('INSERT INTO audit_logs (id, action, entity, "entityId") VALUES ($1,$2,$3,$4)', [id, 'RETENTION_PERMISSION_TEST', 'test', id]);
+    await expect(db.query('DELETE FROM audit_logs WHERE id=$1', [id])).rejects.toThrow(/three years/);
+  } finally { await db.end(); }
+});
+
+test('imports a full batch of 5000 valid passwordless accounts', async () => {
+  const tag = uid();
+  const lines = ['name,email,role,srn'];
+  for (let i = 0; i < 5000; i++) lines.push(`Batch ${i},batch-${tag}-${i}@pes.edu,STUDENT,B-${tag}-${i}`);
+  const result = await api('post', '/users/import').attach('file', Buffer.from(lines.join('\n')), 'batch.csv');
+  expect(result.status).toBe(200);
+  expect(result.body).toMatchObject({ imported: 5000, rejected: 0 });
+  expect(await prisma.user.count({ where: { email: { startsWith: `batch-${tag}-` } } })).toBe(5000);
+}, 120000);
+
+test('configured QR duration is used when no per-session override is supplied', async () => {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const s = await prisma.session.create({ data: { sectionId: section.id, date: today, startTime: '00:00', endTime: '23:59' } });
+  const response = await api('post', `/sessions/${s.id}/qr`, faculty.token).send({});
+  expect(response.status).toBe(201);
+  const audit = await prisma.auditLog.findFirst({ where: { entityId: s.id, action: 'QR_WINDOW_OPENED' } });
+  expect(audit.newValue.minutes).toBe(3);
+});
+
+test('inactive existing students can be retained or removed but cannot be newly enrolled', async () => {
+  const s = await createUser('STUDENT', { active: false });
+  const enrollment = await prisma.enrollment.create({ data: { sectionId: section.id, userId: s.id } });
+  expect((await api('put', `/sections/${section.id}/enrolments`).send({ userIds: [s.id] })).status).toBe(200);
+  expect((await api('put', `/sections/${section.id}/enrolments`).send({ userIds: [] })).status).toBe(200);
+  expect((await api('put', `/sections/${section.id}/enrolments`).send({ userIds: [s.id] })).status).toBe(400);
+  expect(await prisma.enrollment.findUnique({ where: { id: enrollment.id } })).not.toBeNull();
+});

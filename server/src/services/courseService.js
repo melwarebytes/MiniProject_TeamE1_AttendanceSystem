@@ -89,8 +89,10 @@ async function replaceRoster(sectionId, userIds, actor, ip) {
       // Course lock makes simultaneous replacements in different sections safe.
       await tx.$queryRaw`SELECT id FROM courses WHERE id = ${section.courseId} FOR UPDATE`;
       const now = new Date();
-      const valid = await tx.user.count({ where: { id: { in: userIds }, role: 'STUDENT', active: true } });
-      if (valid !== userIds.length) throw badRequest('All selected users must be active students.');
+      const current = await tx.enrollment.findMany({ where: { sectionId }, include: { periods: true } });
+      const existingMembers = new Set(current.filter(e => !e.periods.length || e.periods.some(p => !p.endsAt)).map(e => e.userId));
+      const selectedUsers = await tx.user.findMany({ where: { id: { in: userIds }, role: 'STUDENT' }, select: { id: true, active: true } });
+      if (selectedUsers.length !== userIds.length || selectedUsers.some(u => !u.active && !existingMembers.has(u.id))) throw badRequest('New enrolments require active student accounts.');
       const overlaps = await tx.enrollment.findMany({
         where: {
           userId: { in: userIds },
@@ -108,7 +110,6 @@ async function replaceRoster(sectionId, userIds, actor, ip) {
           'DUPLICATE_ENROLMENT',
           'A student is already enrolled in this course in an overlapping semester. Remove them from the other section first.',
         );
-      const current = await tx.enrollment.findMany({ where: { sectionId }, include: { periods: true } });
       const oldValue = current
         .filter((e) => !e.periods.length || e.periods.some((p) => !p.endsAt))
         .map((e) => e.userId);
@@ -116,7 +117,7 @@ async function replaceRoster(sectionId, userIds, actor, ip) {
         if (!userIds.includes(e.userId)) {
           if (!e.periods.length)
             await tx.enrollmentPeriod.create({
-              data: { enrollmentId: e.id, startsAt: section.semesterStart, endsAt: now },
+              data: { enrollmentId: e.id, startsAt: section.semesterStart < now ? section.semesterStart : now, endsAt: now },
             });
           else
             await tx.enrollmentPeriod.updateMany({

@@ -190,7 +190,7 @@ async function submitAttendanceRoster({ sessionId, records, user, bypassTimeWind
 
   const enrolled = await prisma.enrollment.findMany({ where: { sectionId: session.sectionId }, include: { periods: true } });
   const eligible = new Set(enrolled.filter(e => eligibleForSession(e, session)).map(e => e.id));
-  if (records.length > 300 || new Set(records.map(r => r.enrollmentId)).size !== records.length || records.some(r => !eligible.has(r.enrollmentId) || !['PRESENT', 'LATE', 'ABSENT'].includes(r.status))) {
+  if (records.length > 300 || new Set(records.map(r => r?.enrollmentId)).size !== records.length || records.some(r => !r || !eligible.has(r.enrollmentId) || !['PRESENT', 'LATE', 'ABSENT'].includes(r.status))) {
     throw badRequest('Records must contain unique eligible enrolments and PRESENT, LATE or ABSENT statuses.');
   }
 
