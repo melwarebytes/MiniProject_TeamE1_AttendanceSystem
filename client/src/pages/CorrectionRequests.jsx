@@ -119,7 +119,7 @@ export default function CorrectionRequests({ userRole = 'ADMIN' }) {
                                   reviewNote: '',
                                 })
                               }
-                              className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded"
+                              className="text-xs px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded"
                             >
                               Approve
                             </button>

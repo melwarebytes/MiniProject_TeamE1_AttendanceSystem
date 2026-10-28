@@ -2,11 +2,192 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Field, Notice, Panel, inputClass, buttonClass, allPages } from '../components/AdminUI';
 export default function Reports() {
-  const today=new Date().toISOString().slice(0,10);
-  const [filters,setFilters]=useState({type:'section',from:today.slice(0,8)+'01',to:today,sectionId:'',studentId:'',department:''});
-  const [sections,setSections]=useState([]),[report,setReport]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  useEffect(()=>{allPages('/sections').then(setSections).catch(e=>setError(e.message));},[]);
-  async function generate(e){e.preventDefault();setError('');setBusy(true);try{setReport(await api.request('/reports?'+new URLSearchParams(Object.entries(filters).filter(([,v])=>v))));}catch(e){setError(e.message);}finally{setBusy(false);}}
-  async function download(format){setError('');try{const response=await api.request(`/reports?format=${format}&snapshot=${report.snapshot}`);const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download=`attendance-${report.from}-${report.to}.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){setError(e.message);}}
-  return <div className="max-w-7xl mx-auto px-4 space-y-6"><h1 className="text-2xl font-bold">Attendance reports</h1><Notice error={error}/><Panel title="Report filters"><form onSubmit={generate} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"><Field label="Group by"><select className={inputClass} value={filters.type} onChange={e=>setFilters({...filters,type:e.target.value})}>{['section','course','student','department'].map(t=><option key={t}>{t}</option>)}</select></Field>{['from','to'].map(k=><Field key={k} label={k==='from'?'From date':'To date'}><input className={inputClass} type="date" required value={filters[k]} onChange={e=>setFilters({...filters,[k]:e.target.value})}/></Field>)}<Field label="Section"><select className={inputClass} value={filters.sectionId} onChange={e=>setFilters({...filters,sectionId:e.target.value})}><option value="">All permitted sections</option>{sections.map(s=><option key={s.id} value={s.id}>{s.course.code} / {s.name}</option>)}</select></Field><Field label="Department (optional)"><input className={inputClass} value={filters.department} onChange={e=>setFilters({...filters,department:e.target.value})}/></Field><div className="self-end"><button className={buttonClass} disabled={busy}>{busy?'Generating…':'Generate report'}</button></div></form></Panel>{report && <Panel title={`Report by ${report.type}`}><p className="text-sm text-gray-700">{report.from} to {report.to}. Held counts student-class opportunities. Exports preserve these figures for 15 minutes.</p><div className="flex gap-3"><button className={buttonClass} onClick={()=>download('csv')}>Export CSV</button><button className={buttonClass} onClick={()=>download('pdf')}>Export PDF</button></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Attendance report figures</caption><thead><tr>{['Group','Held','Present','Late','Excused','Absent','Attended','Percentage'].map(c=><th scope="col" className="p-3" key={c}>{c}</th>)}</tr></thead><tbody>{report.rows.map(r=><tr key={r.id} className="border-t">{[r.label,r.held,r.present,r.late,r.excused,r.absent,r.attended,`${r.percentage.toFixed(1)}%`].map((v,i)=><td className="p-3" key={i}>{v}</td>)}</tr>)}</tbody></table>{!report.rows.length && <p role="status">No records match these filters.</p>}</div></Panel>}</div>;
+  const today = new Date().toISOString().slice(0, 10);
+  const [filters, setFilters] = useState({
+    type: 'section',
+    from: today.slice(0, 8) + '01',
+    to: today,
+    sectionId: '',
+    courseId: '',
+    studentId: '',
+    department: '',
+  });
+  const [sections, setSections] = useState([]),
+    [report, setReport] = useState(null),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(false);
+  useEffect(() => {
+    allPages('/sections')
+      .then(setSections)
+      .catch((e) => setError(e.message));
+  }, []);
+  async function generate(e) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      setReport(
+        await api.request('/reports?' + new URLSearchParams(Object.entries(filters).filter(([, v]) => v))),
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function download(format) {
+    setError('');
+    try {
+      const response = await api.request(`/reports?format=${format}&snapshot=${report.snapshot}`);
+      const url = URL.createObjectURL(await response.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `attendance-${report.from}-${report.to}.${format}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  return (
+    <div className="max-w-7xl mx-auto px-4 space-y-6">
+      <h1 className="text-2xl font-bold">Attendance reports</h1>
+      <Notice error={error} />
+      <Panel title="Report filters">
+        <form onSubmit={generate} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Field label="Group by">
+            <select
+              className={inputClass}
+              value={filters.type}
+              onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+            >
+              {['section', 'course', 'student', 'department'].map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+          </Field>
+          {['from', 'to'].map((k) => (
+            <Field key={k} label={k === 'from' ? 'From date' : 'To date'}>
+              <input
+                className={inputClass}
+                type="date"
+                required
+                value={filters[k]}
+                onChange={(e) => setFilters({ ...filters, [k]: e.target.value })}
+              />
+            </Field>
+          ))}
+          <Field label="Section">
+            <select
+              className={inputClass}
+              value={filters.sectionId}
+              onChange={(e) => setFilters({ ...filters, sectionId: e.target.value })}
+            >
+              <option value="">All permitted sections</option>
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.course.code} / {s.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Course">
+            <select
+              className={inputClass}
+              value={filters.courseId}
+              onChange={(e) => setFilters({ ...filters, courseId: e.target.value })}
+            >
+              <option value="">All permitted courses</option>
+              {[...new Map(sections.map((s) => [s.course.id, s.course])).values()].map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} · {c.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Student">
+            <select
+              className={inputClass}
+              value={filters.studentId}
+              onChange={(e) => setFilters({ ...filters, studentId: e.target.value })}
+            >
+              <option value="">All permitted students</option>
+              {[
+                ...new Map(sections.flatMap((s) => s.enrollments.map((e) => [e.user.id, e.user]))).values(),
+              ].map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.srn || u.name} · {u.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Department (optional)">
+            <input
+              className={inputClass}
+              value={filters.department}
+              onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+            />
+          </Field>
+          <div className="self-end">
+            <button className={buttonClass} disabled={busy}>
+              {busy ? 'Generating…' : 'Generate report'}
+            </button>
+          </div>
+        </form>
+      </Panel>
+      {report && (
+        <Panel title={`Report by ${report.type}`}>
+          <p className="text-sm text-gray-700">
+            {report.from} to {report.to}. Held counts student-class opportunities. Exports preserve these
+            figures for 15 minutes.
+          </p>
+          <div className="flex gap-3">
+            <button className={buttonClass} onClick={() => download('csv')}>
+              Export CSV
+            </button>
+            <button className={buttonClass} onClick={() => download('pdf')}>
+              Export PDF
+            </button>
+          </div>
+          <div role="region" aria-label="Scrollable table" tabIndex={0} className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Attendance report figures</caption>
+              <thead>
+                <tr>
+                  {['Group', 'Held', 'Present', 'Late', 'Excused', 'Absent', 'Attended', 'Percentage'].map(
+                    (c) => (
+                      <th scope="col" className="p-3" key={c}>
+                        {c}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {report.rows.map((r) => (
+                  <tr key={r.id} className="border-t">
+                    {[
+                      r.label,
+                      r.held,
+                      r.present,
+                      r.late,
+                      r.excused,
+                      r.absent,
+                      r.attended,
+                      `${r.percentage.toFixed(1)}%`,
+                    ].map((v, i) => (
+                      <td className="p-3" key={i}>
+                        {v}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!report.rows.length && <p role="status">No records match these filters.</p>}
+          </div>
+        </Panel>
+      )}
+    </div>
+  );
 }

@@ -10,7 +10,10 @@ router.get('/', authenticate, authorize('ADMIN', 'FACULTY'), async (req, res, ne
     const report = await reports.getSnapshot(req.query.snapshot, req.user);
     res.attachment(`attendance-${report.from}-${report.to}.${format}`);
     if (format === 'csv') return res.type('text/csv').send(reports.csv(report));
-    res.type('application/pdf'); reports.pdf(report, res);
-  } catch (error) { next(error); }
+    res.type('application/pdf');
+    reports.pdf(report, res);
+  } catch (error) {
+    next(error);
+  }
 });
 module.exports = router;

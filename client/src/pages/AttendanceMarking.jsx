@@ -143,7 +143,7 @@ export default function AttendanceMarking() {
           </div>
 
           <form onSubmit={handleSubmit}>
-            <div className="overflow-x-auto">
+            <div role="region" aria-label="Scrollable table" tabIndex={0} className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 uppercase text-xs font-semibold">
