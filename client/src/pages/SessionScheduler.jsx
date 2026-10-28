@@ -96,7 +96,7 @@ export default function SessionScheduler() {
           </button>
           <button
             onClick={() => setExtraModal({ ...extraModal, open: true })}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold rounded-lg shadow-sm transition"
           >
             + Add Extra Session
           </button>
@@ -238,7 +238,7 @@ export default function SessionScheduler() {
               </button>
               <button
                 onClick={handleAddExtraSession}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm"
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold rounded-lg shadow-sm"
               >
                 Add Session
               </button>

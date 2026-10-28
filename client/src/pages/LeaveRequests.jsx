@@ -226,7 +226,7 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleReview(l.id, 'APPROVE')}
-                            className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded"
+                            className="text-xs px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded"
                           >
                             Approve
                           </button>

@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { eligibleForSession, sessionInstant } = require('./membershipService');
 const { calculateMetrics } = require('./dashboardService');
 const { sendEmail } = require('../utils/mailer');
 const { recordAuditLog } = require('./auditService');
@@ -25,7 +26,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
   const now = new Date();
 
   // Find enrolled students to check
-  const enrollmentWhere = { sectionId };
+  const enrollmentWhere = { sectionId, user: { active: true } };
   if (specificStudentId) {
     enrollmentWhere.userId = specificStudentId;
   }
@@ -34,6 +35,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
     where: enrollmentWhere,
     include: {
       user: true,
+      periods: true,
       attendanceRecords: {
         where: {
           session: { status: { not: 'CANCELLED' } },
@@ -57,8 +59,9 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
     let held = 0;
 
     section.sessions.forEach((sess) => {
+      if (!eligibleForSession(enr, sess)) return;
       const rec = recordsMap.get(sess.id);
-      const isPastOrMarked = new Date(sess.date) <= now || !!rec;
+      const isPastOrMarked = sessionInstant(sess) <= now || !!rec;
       if (isPastOrMarked) {
         held += 1;
         if (rec && ['PRESENT', 'LATE', 'EXCUSED'].includes(rec.status)) {
@@ -165,6 +168,7 @@ async function listStudentsBelowThreshold(sectionId, user) {
   const enrollments = await prisma.enrollment.findMany({
     where: { sectionId },
     include: {
+      periods: true,
       user: {
         select: { id: true, name: true, srn: true, email: true },
       },
@@ -188,8 +192,9 @@ async function listStudentsBelowThreshold(sectionId, user) {
     let held = 0;
 
     section.sessions.forEach((sess) => {
+      if (!eligibleForSession(enr, sess)) return;
       const rec = recordsMap.get(sess.id);
-      const isPastOrMarked = new Date(sess.date) <= now || !!rec;
+      const isPastOrMarked = sessionInstant(sess) <= now || !!rec;
       if (isPastOrMarked) {
         held += 1;
         if (rec && ['PRESENT', 'LATE', 'EXCUSED'].includes(rec.status)) {

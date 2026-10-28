@@ -75,3 +75,58 @@ Repeat the drill once per quarter and add a row here.
 
 ## CI/CD
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every push and pull request to `main`: server lint and Jest tests against real PostgreSQL and Redis services, the client build, and a check that each PR links a backlog issue.
+
+## Versioned migrations and restricted database accounts
+
+The Compose `migrate` service runs before the API. It uses the database owner to
+apply migrations and provision `sams_app` and `sams_retention`. Set URL-safe
+`APP_DB_PASSWORD` and `RETENTION_DB_PASSWORD` (16+ characters) in `.env`.
+The API uses `sams_app`, which can read/append audit entries but cannot update,
+delete or truncate them. The separate retention worker uses `sams_retention`;
+a database trigger prohibits deleting audit entries younger than three years.
+Do not use the migration owner as the runtime `DATABASE_URL`.
+
+For an **existing installation created with `prisma db push`**, back up first,
+compare the database to the initial migration, and baseline the already-existing
+schema once (using the owner connection):
+
+```bash
+cd server
+npx prisma migrate resolve --applied 20261027000000_initial
+npm run migrate:deploy
+npm run db:roles
+```
+
+Use `migrate resolve` only if the existing schema matches the initial migration.
+A new empty database needs only `npm run migrate:deploy`, never a baseline.
+`npm run seed` is repeatable and creates demo Admin, Faculty and Student accounts.
+
+The retention worker runs daily at 02:30 Asia/Kolkata. It anonymises students only
+when **every enrolled semester ended more than two years ago**; accounts without
+an enrolment are skipped because no retention end can be inferred. Credentials,
+reset/refresh tokens, leave text and attachments, alerts and personal profile
+fields are removed. Attendance aggregates retain opaque IDs. Audit history is
+kept under the separate three-year rule and is never rewritten. Failures are
+logged; the next nightly run retries. A database advisory lock prevents two
+workers from performing the same cleanup concurrently.
+
+## Admin and report screens
+
+Admins have Users, Courses & Enrolments, Reports and Policy pages. CSV headers are
+`name,email,role,srn,department`, with optional `password,active`. The default email
+domain is `pes.edu`; configure `INSTITUTION_EMAIL_DOMAIN` for another institution.
+Existing email addresses update accounts; new accounts without a password must
+use Forgot password. Student SRNs are required. `active` is `true` or `false`.
+Errors identify physical CSV line numbers while valid records still import.
+
+Roster changes are effective at the time they are saved; past rosters remain
+intact. Remove a student from their old section before enrolling them in another
+section of the same course/semester. Global policy updates apply to all sections;
+the QR default is 1–10 minutes, as required by FR-07. Holidays affect timetable
+session generation, without cancelling previously scheduled sessions.
+
+Faculty reports are restricted to their assigned sections. Each generated report
+has a user-bound 15-minute snapshot; CSV/PDF exports read that exact snapshot so
+subsequent attendance edits cannot silently change downloaded figures. Regenerate
+an expired report to export again. Cancelled sessions are excluded and EXCUSED
+counts as attended, matching SADS §8.2.

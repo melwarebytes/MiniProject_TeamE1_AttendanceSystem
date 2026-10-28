@@ -18,7 +18,6 @@ import AuditLog from './pages/AuditLog';
 export const NAV = [
   { path: '/users', label: 'Users', roles: ['ADMIN'], render: () => <UserManagement /> },
   { path: '/courses', label: 'Courses & Enrolments', roles: ['ADMIN'], render: () => <CourseManagement /> },
-  { path: '/reports', label: 'Reports', roles: ['ADMIN', 'FACULTY'], render: () => <Reports /> },
   { path: '/policies', label: 'Policy', roles: ['ADMIN'], render: () => <PolicySettings /> },
   { path: '/dashboard', label: 'My Attendance', roles: ['STUDENT'], render: () => <StudentDashboard /> },
   { path: '/check-in', label: 'Check In', roles: ['STUDENT'], render: () => <QrCheckIn /> },
@@ -28,6 +27,7 @@ export const NAV = [
   { path: '/corrections', label: 'Corrections', roles: ['FACULTY', 'ADMIN'], render: (role) => <CorrectionRequests userRole={role} /> },
   { path: '/leave', label: 'Leave', roles: ['STUDENT', 'FACULTY', 'ADMIN'], render: (role) => <LeaveRequests userRole={role} /> },
   { path: '/defaulters', label: 'Defaulters', roles: ['FACULTY', 'ADMIN'], render: () => <DefaultersList /> },
+  { path: '/reports', label: 'Reports', roles: ['ADMIN', 'FACULTY'], render: () => <Reports /> },
   { path: '/audit', label: 'Audit Log', roles: ['ADMIN'], render: () => <AuditLog /> },
 ];
 
