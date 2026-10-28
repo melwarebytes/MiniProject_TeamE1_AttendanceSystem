@@ -9,7 +9,7 @@ const { page } = require('../utils/input');
 const { badRequest } = require('../utils/errors');
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
-router.use(authenticate);
+router.use(['/users', '/courses', '/sections', '/policies'], authenticate);
 router.get(
   '/sections',
   authorize('ADMIN', 'FACULTY'),

@@ -191,6 +191,7 @@ async function todaysSessions(user) {
       id: s.id,
       course: `${s.section.course.code}-${s.section.name}`,
       courseName: s.section.course.name,
+      qrWindowMinutes: s.section.qrWindowMinutes,
       startTime: s.startTime,
       endTime: s.endTime,
       enrolled: s.section._count.enrollments,

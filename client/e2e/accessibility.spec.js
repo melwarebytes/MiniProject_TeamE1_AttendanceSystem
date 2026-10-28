@@ -103,7 +103,7 @@ for (const [role, paths] of [
   ['STUDENT', ['/dashboard', '/leave', '/check-in']],
 ]) {
   for (const path of paths)
-    test(`${role || 'PUBLIC'} ${path} accessibility and responsive layout`, async ({ page }) => {
+    test(`${role || 'PUBLIC'} ${path} accessibility and responsive layout`, async ({ page }, testInfo) => {
       await mock(page, role);
       await page.goto(path);
       if (path === '/reports') {
@@ -111,6 +111,10 @@ for (const [role, paths] of [
         await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
       }
       await scan(page);
+      if (testInfo.project.name.startsWith('chromium') && ['/users', '/reports', '/mark'].includes(path)) {
+        const screenshot = await page.screenshot({ fullPage: true });
+        await testInfo.attach('page-preview', { body: screenshot, contentType: 'image/png' });
+      }
     });
 }
 test('faculty completes marking using only the keyboard', async ({ page }) => {

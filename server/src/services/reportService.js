@@ -96,7 +96,7 @@ async function generateReport(query, user) {
   const report = { type, from: query.from, to: query.to, generatedAt: now.toISOString(), rows };
   const snapshot = crypto.randomUUID();
   // Exports use this immutable, user-bound snapshot, even if marks change later.
-  await redis.set(`report:${snapshot}`, JSON.stringify({ userId: user.id, report }), 'EX', 900);
+  await redis.set(`report:${snapshot}`, JSON.stringify({ userId: user.id, report, sectionIds: [...new Set(enrollments.map(e => e.sectionId))] }), 'EX', 900);
   return { ...report, snapshot };
 }
 async function getSnapshot(id, user) {
@@ -112,37 +112,11 @@ async function getSnapshot(id, user) {
       where: { userId: user.id },
       select: { sectionId: true },
     });
-    const current = assignments
-      .map((a) => a.sectionId)
-      .sort()
-      .join(',');
-    if (snapshot.assignments !== current)
+    const current = new Set(assignments.map(a => a.sectionId));
+    if (!snapshot.sectionIds || snapshot.sectionIds.some(id => !current.has(id)))
       throw forbidden('Section assignments changed; generate a new report.');
   }
   return snapshot.report;
-}
-async function createReport(query, user) {
-  const report = await generateReport(query, user);
-  if (user.role === 'FACULTY') {
-    const assignments = await prisma.sectionFaculty.findMany({
-      where: { userId: user.id },
-      select: { sectionId: true },
-    });
-    await redis.set(
-      `report:${report.snapshot}`,
-      JSON.stringify({
-        userId: user.id,
-        report,
-        assignments: assignments
-          .map((a) => a.sectionId)
-          .sort()
-          .join(','),
-      }),
-      'EX',
-      900,
-    );
-  }
-  return report;
 }
 function csv(report) {
   // Spreadsheet formula injection protection; RFC 4180 quotes and CRLF.
@@ -182,4 +156,4 @@ function pdf(report, res) {
   if (!report.rows.length) doc.text('No records match the selected filters.');
   doc.end();
 }
-module.exports = { createReport, getSnapshot, csv, pdf };
+module.exports = { createReport: generateReport, getSnapshot, csv, pdf };

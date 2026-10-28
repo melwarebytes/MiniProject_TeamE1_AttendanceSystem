@@ -14,7 +14,7 @@ export default function CourseManagement() {
     const [c, s, u] = await Promise.all([allPages('/courses'), allPages('/sections'), allPages('/users')]);
     setCourses(c);
     setSections(s);
-    setUsers(u.filter((u) => u.active));
+    setUsers(u);
     return s;
   }
   function choose(id, data = sections) {
@@ -139,13 +139,14 @@ export default function CourseManagement() {
                             <input
                               type="checkbox"
                               checked={chosen.includes(u.id)}
+                              disabled={!u.active && !chosen.includes(u.id)}
                               onChange={(e) =>
                                 setChosen(
                                   e.target.checked ? [...chosen, u.id] : chosen.filter((id) => id !== u.id),
                                 )
                               }
                             />
-                            {u.name} ({u.srn || u.email})
+                            {u.name} ({u.srn || u.email}){!u.active && ' · inactive'}
                           </label>
                         ))}
                     </div>
