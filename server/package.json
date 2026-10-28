@@ -12,13 +12,19 @@
     "migrate:deploy": "prisma migrate deploy",
     "generate": "prisma generate",
     "seed": "node prisma/seed.js",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "db:roles": "node scripts/provision-roles.js",
+    "retention": "node scripts/retention-worker.js",
+    "bootstrap": "node scripts/start.js",
+    "test:load": "node scripts/load-test.js"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
+    "csv-parse": "^7.0.3",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
@@ -29,10 +35,10 @@
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.7",
+    "pdfkit": "^0.20.2",
+    "pg": "^8.13.1",
     "uuid": "^9.0.0",
-    "winston": "^3.11.0",
-    "@prisma/adapter-pg": "^7.10.1",
-    "pg": "^8.13.1"
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.8",

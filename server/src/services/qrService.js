@@ -11,6 +11,7 @@
  *   5. first check-in for this session    -> 409 DUPLICATE_CHECKIN
  */
 const crypto = require('crypto');
+const { eligibleForSession } = require('./membershipService');
 const prisma = require('../utils/prisma');
 const redis = require('../utils/redis');
 const { recordAuditLog } = require('./auditService');
@@ -57,11 +58,11 @@ async function getWindow(sessionId) {
 /** Faculty opens a check-in window of 1–10 minutes for today's session. */
 async function openWindow(sessionId, minutes, user, ip) {
   await connected();
-  const mins = Number(minutes);
+  const session = await loadSessionFor(sessionId, user);
+  const mins = Number(minutes ?? session.section.qrWindowMinutes);
   if (!Number.isInteger(mins) || mins < MIN_WINDOW_MIN || mins > MAX_WINDOW_MIN) {
     throw badRequest(`Window length must be between ${MIN_WINDOW_MIN} and ${MAX_WINDOW_MIN} minutes.`);
   }
-  const session = await loadSessionFor(sessionId, user);
   if (session.status === 'CANCELLED') throw new AppError(409, 'SESSION_CANCELLED', 'This session was cancelled.');
   if (!isSameDay(new Date(session.date), new Date())) {
     throw new AppError(409, 'SESSION_NOT_TODAY', 'QR check-in can only be opened on the day of the class.');
@@ -140,9 +141,9 @@ async function checkIn(token, student, ip) {
   // 4. enrolment
   const session = await prisma.session.findUnique({ where: { id: sessionId } });
   const enrollment = session
-    ? await prisma.enrollment.findUnique({ where: { sectionId_userId: { sectionId: session.sectionId, userId: student.id } } })
+    ? await prisma.enrollment.findUnique({ where: { sectionId_userId: { sectionId: session.sectionId, userId: student.id } }, include: { periods: true } })
     : null;
-  if (!enrollment) throw await fail(reject(403, 'NOT_ENROLLED', 'You are not enrolled in this class.'), sessionId);
+  if (!enrollment || !eligibleForSession(enrollment, session) || session.status === 'CANCELLED') throw await fail(reject(403, 'NOT_ENROLLED', 'You are not enrolled in this class.'), sessionId);
 
   // 5. one check-in per student per session (atomic)
   const first = await redis.set(checkinKey(sessionId, student.id), '1', 'EX', 24 * 60 * 60, 'NX');

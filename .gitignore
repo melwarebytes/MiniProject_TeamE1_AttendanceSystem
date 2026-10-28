@@ -28,3 +28,6 @@ Thumbs.db
 
 # Database backups (ops/backup.sh)
 backups/
+
+client/playwright-report/
+client/test-results/

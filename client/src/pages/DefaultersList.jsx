@@ -46,7 +46,7 @@ export default function DefaultersList() {
           </p>
         </div>
         <form onSubmit={handleSearch} className="flex gap-2">
-          <input
+          <input aria-label="Section ID"
             type="text"
             placeholder="Enter Section ID"
             value={sectionId}

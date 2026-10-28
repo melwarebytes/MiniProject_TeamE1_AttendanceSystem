@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { eligibleForSession, sessionInstant } = require('./membershipService');
 
 /**
  * FR-09: Calculate attendance stats for a student in an enrolled section
@@ -58,6 +59,7 @@ async function getStudentDashboard(targetUserId, requestingUser) {
   const enrollments = await prisma.enrollment.findMany({
     where: { userId: targetUserId },
     include: {
+      periods: true,
       section: {
         include: {
           course: true,
@@ -98,8 +100,9 @@ async function getStudentDashboard(targetUserId, requestingUser) {
     let heldSessionsCount = 0;
 
     section.sessions.forEach((sess) => {
+      if (!eligibleForSession(enr, sess)) return;
       const record = recordsMap.get(sess.id);
-      const isPastOrMarked = new Date(sess.date) <= now || !!record;
+      const isPastOrMarked = sessionInstant(sess) <= now || !!record;
 
       if (isPastOrMarked) {
         heldSessionsCount += 1;

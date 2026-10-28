@@ -94,8 +94,8 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-semibold text-gray-600">Section ID *</label>
-                <input
+                <label htmlFor="LeaveRequests-field-1" className="text-xs font-semibold text-gray-600">Section ID *</label>
+                <input id="LeaveRequests-field-1"
                   type="text"
                   placeholder="e.g. Section UUID"
                   value={form.sectionId}
@@ -105,8 +105,8 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600">Start Date *</label>
-                <input
+                <label htmlFor="LeaveRequests-field-2" className="text-xs font-semibold text-gray-600">Start Date *</label>
+                <input id="LeaveRequests-field-2"
                   type="date"
                   value={form.startDate}
                   onChange={(e) => setForm({ ...form, startDate: e.target.value })}
@@ -115,8 +115,8 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600">End Date *</label>
-                <input
+                <label htmlFor="LeaveRequests-field-3" className="text-xs font-semibold text-gray-600">End Date *</label>
+                <input id="LeaveRequests-field-3"
                   type="date"
                   value={form.endDate}
                   onChange={(e) => setForm({ ...form, endDate: e.target.value })}
@@ -127,8 +127,8 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-gray-600">Reason for Absence *</label>
-              <textarea
+              <label htmlFor="LeaveRequests-field-4" className="text-xs font-semibold text-gray-600">Reason for Absence *</label>
+              <textarea id="LeaveRequests-field-4"
                 placeholder="Explain the medical reason, university event, or emergency..."
                 value={form.reason}
                 onChange={(e) => setForm({ ...form, reason: e.target.value })}
@@ -139,8 +139,8 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-gray-600">Supporting Document (PDF, JPG, PNG ≤ 5MB)</label>
-              <input
+              <label htmlFor="LeaveRequests-field-5" className="text-xs font-semibold text-gray-600">Supporting Document (PDF, JPG, PNG ≤ 5MB)</label>
+              <input id="LeaveRequests-field-5"
                 type="file"
                 accept=".pdf,image/jpeg,image/png"
                 onChange={(e) => setForm({ ...form, file: e.target.files[0] || null })}

@@ -168,7 +168,7 @@ export default function SessionScheduler() {
             <p className="text-xs text-gray-500">
               Cancelled sessions are excluded from attendance percentage calculations.
             </p>
-            <textarea
+            <textarea aria-label="Cancellation reason"
               placeholder="Reason for cancellation (e.g. Faculty medical leave, guest lecture rescheduled)"
               value={cancelModal.reason}
               onChange={(e) => setCancelModal({ ...cancelModal, reason: e.target.value })}
@@ -200,8 +200,8 @@ export default function SessionScheduler() {
             <h3 className="text-lg font-bold text-gray-800">Schedule Extra Class Session</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-gray-600">Date</label>
-                <input
+                <label htmlFor="SessionScheduler-field-1" className="text-xs font-semibold text-gray-600">Date</label>
+                <input id="SessionScheduler-field-1"
                   type="date"
                   value={extraModal.date}
                   onChange={(e) => setExtraModal({ ...extraModal, date: e.target.value })}
@@ -210,8 +210,8 @@ export default function SessionScheduler() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-gray-600">Start Time</label>
-                  <input
+                  <label htmlFor="SessionScheduler-field-2" className="text-xs font-semibold text-gray-600">Start Time</label>
+                  <input id="SessionScheduler-field-2"
                     type="time"
                     value={extraModal.startTime}
                     onChange={(e) => setExtraModal({ ...extraModal, startTime: e.target.value })}
@@ -219,8 +219,8 @@ export default function SessionScheduler() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600">End Time</label>
-                  <input
+                  <label htmlFor="SessionScheduler-field-3" className="text-xs font-semibold text-gray-600">End Time</label>
+                  <input id="SessionScheduler-field-3"
                     type="time"
                     value={extraModal.endTime}
                     onChange={(e) => setExtraModal({ ...extraModal, endTime: e.target.value })}

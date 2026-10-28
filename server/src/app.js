@@ -72,6 +72,9 @@ app.use('/api/v1/alerts', alertRoutes);
 app.use('/api/v1', qrRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 
+app.use('/api/v1', require('./routes/adminRoutes'));
+app.use('/api/v1/reports', require('./routes/reportRoutes'));
+
 // 404 Not Found handler
 app.use((req, res) => {
   res.status(404).json({ code: 'NOT_FOUND', status: 404, error: `Not Found: ${req.method} ${req.originalUrl}` });
