@@ -122,3 +122,33 @@ jobs:
         with:
           name: safari-results
           path: client/safari-results/
+  deployment:
+    name: Deployment (Compose, seed, restore, live demo)
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: sams_sprint_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: ./ops/smoke-test.sh
+      - run: npm ci --prefix client
+      - run: cd client && npx playwright install --with-deps chromium
+      - run: cd client && node e2e/live-demo.mjs
+      - name: Save container diagnostics
+        if: always()
+        run: |
+          mkdir -p release-results
+          docker compose ps -a > release-results/containers.txt
+          docker compose logs --no-color > release-results/containers.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sprint-release-evidence
+          path: release-results/
+      - name: Remove the disposable CI stack
+        if: always()
+        run: docker compose down -v

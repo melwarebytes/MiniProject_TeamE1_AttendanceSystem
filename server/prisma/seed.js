@@ -168,7 +168,8 @@ async function main() {
     const sessionDate = new Date();
     sessionDate.setDate(today.getDate() - (6 - i));
 
-    const sess = await prisma.session.create({
+    sessionDate.setUTCHours(0, 0, 0, 0);
+    const sess = await prisma.session.findFirst({ where: { sectionId: sectionA.id, date: sessionDate, startTime: '09:00', endTime: '10:00' } }) || await prisma.session.create({
       data: {
         sectionId: sectionA.id,
         date: sessionDate,
@@ -179,8 +180,10 @@ async function main() {
     });
 
     // Mark 4 present and 1 absent for Bhuvan (80% attendance)
-    await prisma.attendanceRecord.create({
-      data: {
+    await prisma.attendanceRecord.upsert({
+      where: { sessionId_enrollmentId: { sessionId: sess.id, enrollmentId: bhuvanEnrollment.id } },
+      update: {},
+      create: {
         enrollmentId: bhuvanEnrollment.id,
         sessionId: sess.id,
         status: i === 3 ? 'ABSENT' : 'PRESENT',
