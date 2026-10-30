@@ -75,20 +75,19 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
     const metrics = calculateMetrics({ attended, held, threshold });
 
     if (metrics.isLowAttendance) {
-      // Check 7-day rate limit for this student & section
-      const recentAlert = await prisma.attendanceAlert.findFirst({
-        where: {
-          userId: student.id,
-          sectionId: section.id,
-          sentAt: {
-            gte: sevenDaysAgo,
+      // Serialize the seven-day decision across sections of the same course.
+      const newAlert = await prisma.$transaction(async (tx) => {
+        const key = `${student.id}:${section.courseId}`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`;
+        const recent = await tx.attendanceAlert.findFirst({
+          where: {
+            userId: student.id,
+            section: { courseId: section.courseId },
+            sentAt: { gte: sevenDaysAgo },
           },
-        },
-      });
-
-      if (!recentAlert) {
-        // Create in-app alert record
-        const newAlert = await prisma.attendanceAlert.create({
+        });
+        if (recent) return null;
+        const created = await tx.attendanceAlert.create({
           data: {
             userId: student.id,
             sectionId: section.id,
@@ -97,7 +96,17 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
             sentAt: new Date(),
           },
         });
-
+        await recordAuditLog({
+          actorId: null,
+          action: 'LOW_ATTENDANCE_ALERT_TRIGGERED',
+          entity: 'attendance_alerts',
+          entityId: created.id,
+          newValue: { userId: student.id, sectionId: section.id, percentage: metrics.percentage, threshold },
+          tx,
+        });
+        return created;
+      });
+      if (newAlert) {
         alertsTriggered.push(newAlert);
 
         // Send email alert
@@ -107,20 +116,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
           to: student.email,
           subject: `Low Attendance Warning: ${section.course.code} (${metrics.percentage}%)`,
           text: emailBody,
-        });
-
-        await recordAuditLog({
-          actorId: null, // System event
-          action: 'LOW_ATTENDANCE_ALERT_TRIGGERED',
-          entity: 'attendance_alerts',
-          entityId: newAlert.id,
-          newValue: {
-            userId: student.id,
-            sectionId: section.id,
-            percentage: metrics.percentage,
-            threshold,
-          },
-        });
+        }).catch((error) => require('../utils/logger').error('Alert email failed', error));
       }
     }
   }

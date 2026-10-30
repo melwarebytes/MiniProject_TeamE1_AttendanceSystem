@@ -57,7 +57,12 @@ async function getStudentDashboard(targetUserId, requestingUser) {
 
   // Find all enrollments for this student
   const enrollments = await prisma.enrollment.findMany({
-    where: { userId: targetUserId },
+    where: {
+      userId: targetUserId,
+      ...(requestingUser.role === 'FACULTY'
+        ? { section: { faculty: { some: { userId: requestingUser.id } } } }
+        : {}),
+    },
     include: {
       periods: true,
       section: {
@@ -79,6 +84,7 @@ async function getStudentDashboard(targetUserId, requestingUser) {
     },
   });
 
+  if (requestingUser.role === 'FACULTY' && !enrollments.length) throw require('../utils/errors').forbidden();
   const now = new Date();
 
   const coursesSummary = enrollments.map((enr) => {
@@ -157,7 +163,8 @@ async function getStudentDashboard(targetUserId, requestingUser) {
   // Calculate overall metrics across all enrolled courses
   const totalHeldAll = coursesSummary.reduce((acc, c) => acc + c.stats.totalHeld, 0);
   const totalAttendedAll = coursesSummary.reduce((acc, c) => acc + c.stats.attended, 0);
-  const overallPercentage = totalHeldAll > 0 ? Number(((totalAttendedAll / totalHeldAll) * 100).toFixed(1)) : 100.0;
+  const overallPercentage =
+    totalHeldAll > 0 ? Number(((totalAttendedAll / totalHeldAll) * 100).toFixed(1)) : 100.0;
 
   return {
     student,

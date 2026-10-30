@@ -2,6 +2,9 @@ const prisma = require('../utils/prisma');
 const { recordAuditLog } = require('./auditService');
 const { sendEmail } = require('../utils/mailer');
 const logger = require('../utils/logger');
+const { isFacultyAssigned } = require('./attendanceService');
+const { dateOnly, text } = require('../utils/input');
+const { forbidden, conflict } = require('../utils/errors');
 
 /**
  * FR-10: Submit a leave / excused absence request
@@ -13,8 +16,9 @@ async function submitLeaveRequest({ studentUser, sectionId, startDate, endDate, 
     throw err;
   }
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = dateOnly(startDate);
+  const end = dateOnly(endDate);
+  reason = text(reason, 'Reason', 2000);
 
   if (start > end) {
     const err = new Error('Leave start date must be before or equal to end date');
@@ -94,6 +98,13 @@ async function listLeaveRequests({ user, sectionId, status }) {
   // Student can only see their own requests
   if (user.role === 'STUDENT') {
     where.userId = user.id;
+  } else if (user.role === 'FACULTY') {
+    const assignments = await prisma.sectionFaculty.findMany({
+      where: { userId: user.id },
+      select: { sectionId: true },
+    });
+    if (sectionId && !assignments.some((a) => a.sectionId === sectionId)) throw forbidden();
+    where.sectionId = sectionId || { in: assignments.map((a) => a.sectionId) };
   }
 
   return prisma.leaveRequest.findMany({
@@ -132,6 +143,9 @@ async function reviewLeaveRequest({ leaveId, action, reviewNote, reviewerUser })
     throw err;
   }
 
+  if (reviewerUser.role === 'FACULTY' && !(await isFacultyAssigned(reviewerUser.id, leave.sectionId)))
+    throw forbidden();
+
   if (leave.status !== 'PENDING') {
     const err = new Error(`Leave request has already been ${leave.status.toLowerCase()}`);
     err.status = 400;
@@ -142,6 +156,11 @@ async function reviewLeaveRequest({ leaveId, action, reviewNote, reviewerUser })
   const newStatus = isApproved ? 'APPROVED' : 'REJECTED';
 
   const updated = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.leaveRequest.updateMany({
+      where: { id: leaveId, status: 'PENDING' },
+      data: { status: newStatus },
+    });
+    if (!claimed.count) throw conflict('ALREADY_REVIEWED', 'This request has already been reviewed.');
     let convertedCount = 0;
 
     if (isApproved) {
@@ -177,6 +196,7 @@ async function reviewLeaveRequest({ leaveId, action, reviewNote, reviewerUser })
             where: { id: record.id },
             data: {
               status: 'EXCUSED',
+              source: 'LEAVE',
               version: { increment: 1 },
             },
           });

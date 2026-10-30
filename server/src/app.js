@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const path = require('path');
 
 const authRoutes = require('./routes/authRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
@@ -36,8 +35,7 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 app.use('/api/', apiLimiter);
 
-// Static uploads directory
-app.use('/uploads', express.static(path.resolve(process.env.UPLOAD_DIR || 'uploads')));
+// Leave attachments are served only through the authenticated leave route.
 
 // Health check endpoint (NFR-03): 200 when the database and Redis respond, 503 otherwise.
 // Docker's health check and the uptime monitor both call this.

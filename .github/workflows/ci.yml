@@ -112,7 +112,10 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Enable native Safari WebDriver on the disposable runner
-        run: sudo safaridriver --enable
+        run: |
+          sudo safaridriver --enable
+          defaults write com.apple.Safari WebKitTabToLinksPreferenceKey -bool true
+          defaults write com.apple.Safari WebKitPreferences.tabFocusesLinks -bool true
       - run: node e2e/safari.mjs
       - uses: actions/upload-artifact@v4
         if: always()
