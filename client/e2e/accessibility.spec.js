@@ -144,3 +144,16 @@ test('faculty completes marking using only the keyboard', async ({ page }) => {
   await expect(page.getByRole('status')).toContainText('successfully submitted');
   expect(submitted().records).toEqual([{ enrollmentId: 'e1', status: 'LATE' }]);
 });
+
+test('student-supplied markup is displayed as text, never executed', async ({ page }) => {
+  await mock(page, 'FACULTY');
+  const payload = '<img src=x onerror="window.samsXssExecuted=true">';
+  await page.route('**/api/v1/attendance/roster/**', route => route.fulfill({ json: {
+    session,
+    roster: [{ enrollmentId: 'e1', studentName: payload, srn: 'PES101', status: 'PRESENT' }],
+  } }));
+  await page.goto('/mark');
+  await expect(page.getByText(payload, { exact: true })).toBeVisible();
+  await expect(page.locator('img[src="x"]')).toHaveCount(0);
+  expect(await page.evaluate(() => window.samsXssExecuted)).toBeUndefined();
+});
