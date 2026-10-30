@@ -155,3 +155,16 @@ test('concurrent low-attendance checks send one alert and faculty cannot inspect
   expect(await checkAndTriggerAlertsForSection(section.id)).toEqual([]);
   expect((await api('get', '/alerts/my', student)).body.alerts).toHaveLength(1);
 });
+
+test('assigned faculty can mark attendance; other faculty and SQL-shaped credentials cannot', async () => {
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const session = await prisma.session.create({ data: { sectionId: section.id, date: new Date(date), startTime: '00:00', endTime: '23:59' } });
+  const records = [{ enrollmentId: enrollment.id, status: 'LATE' }];
+  expect((await api('post', `/attendance/roster/${session.id}`, other).send({ records })).status).toBe(403);
+  const saved = await api('post', `/attendance/roster/${session.id}`).send({ records });
+  expect(saved.status).toBe(200);
+  expect((await prisma.attendanceRecord.findFirst({ where: { sessionId: session.id, enrollmentId: enrollment.id } })).status).toBe('LATE');
+  const login = await request(app).post('/api/v1/auth/login').send({ email: "' OR 1=1 --", password: 'Correct-Horse-42' });
+  expect(login.status).toBe(400);
+  expect(await prisma.user.findUnique({ where: { id: student.user.id } })).not.toBeNull();
+});
