@@ -1,6 +1,22 @@
 const prisma = require('../utils/prisma');
 const { recordAuditLog } = require('./auditService');
 
+const { badRequest, forbidden, notFound, conflict } = require('../utils/errors');
+const { dateOnly, text } = require('../utils/input');
+const { isFacultyAssigned } = require('./attendanceService');
+
+async function requireSection(sectionId, user) {
+  const section = await prisma.section.findUnique({ where: { id: sectionId } });
+  if (!section) throw notFound('Section not found.');
+  if (user.role !== 'ADMIN' && !(user.role === 'FACULTY' && (await isFacultyAssigned(user.id, sectionId))))
+    throw forbidden();
+  return section;
+}
+function validateTimes(start, end) {
+  const valid = (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+  if (!valid(start) || !valid(end) || start >= end) throw badRequest('Use HH:mm times with end after start.');
+}
+
 const DAY_MAP = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 /**
@@ -14,7 +30,8 @@ function toDateString(d) {
 /**
  * FR-05: Generate sessions between semester start and end from timetable, skipping holidays
  */
-async function generateSessionsFromTimetable({ sectionId, actorId }) {
+async function generateSessionsFromTimetable({ sectionId, actorId, user }) {
+  await requireSection(sectionId, user);
   const section = await prisma.section.findUnique({
     where: { id: sectionId },
     include: {
@@ -24,7 +41,7 @@ async function generateSessionsFromTimetable({ sectionId, actorId }) {
   });
 
   if (!section) {
-    throw new Error('Section not found');
+    throw notFound('Section not found.');
   }
 
   // Fetch institution-wide holidays as well
@@ -52,16 +69,16 @@ async function generateSessionsFromTimetable({ sectionId, actorId }) {
   });
 
   const sessionsToCreate = [];
-  const curr = new Date(startDate);
+  const curr = dateOnly(startDate);
 
   // Normalize time
-  curr.setHours(0, 0, 0, 0);
+  curr.setUTCHours(0, 0, 0, 0);
   const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  end.setUTCHours(23, 59, 59, 999);
 
   while (curr <= end) {
     const dateStr = toDateString(curr);
-    const dayOfWeek = DAY_MAP[curr.getDay()];
+    const dayOfWeek = DAY_MAP[curr.getUTCDay()];
 
     // Skip holidays
     if (!holidayDateSet.has(dateStr)) {
@@ -78,14 +95,20 @@ async function generateSessionsFromTimetable({ sectionId, actorId }) {
     }
 
     // Advance 1 day
-    curr.setDate(curr.getDate() + 1);
+    curr.setUTCDate(curr.getUTCDate() + 1);
   }
 
   // Delete existing scheduled sessions without attendance if regenerating, or simply create new
   const createdSessions = await prisma.$transaction(async (tx) => {
-    // We create the sessions
+    // Serialize generation and extra sessions for the section; reruns preserve marks.
+    await tx.$queryRaw`SELECT id FROM sections WHERE id=${sectionId} FOR UPDATE`;
+    const existing = await tx.session.findMany({ where: { sectionId } });
+    const keys = new Set(existing.map((s) => `${toDateString(s.date)}|${s.startTime}|${s.endTime}`));
     const created = [];
     for (const s of sessionsToCreate) {
+      const key = `${toDateString(s.date)}|${s.startTime}|${s.endTime}`;
+      if (keys.has(key)) continue;
+      keys.add(key);
       const sess = await tx.session.create({
         data: s,
       });
@@ -110,8 +133,16 @@ async function generateSessionsFromTimetable({ sectionId, actorId }) {
 /**
  * FR-05: Add an extra class session
  */
-async function addExtraSession({ sectionId, date, startTime, endTime, actorId }) {
+async function addExtraSession({ sectionId, date, startTime, endTime, actorId, user }) {
+  const section = await requireSection(sectionId, user);
+  date = dateOnly(date);
+  validateTimes(startTime, endTime);
+  if (date < section.semesterStart || date > section.semesterEnd)
+    throw badRequest('Date must be inside the semester.');
   const session = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM sections WHERE id=${sectionId} FOR UPDATE`;
+    if (await tx.session.findFirst({ where: { sectionId, date, startTime, endTime } }))
+      throw conflict('DUPLICATE_SESSION', 'This session already exists.');
     const created = await tx.session.create({
       data: {
         sectionId,
@@ -140,17 +171,20 @@ async function addExtraSession({ sectionId, date, startTime, endTime, actorId })
 /**
  * FR-05: Cancel a session with a reason
  */
-async function cancelSession({ sessionId, reason, actorId }) {
+async function cancelSession({ sessionId, reason, actorId, user }) {
+  reason = text(reason, 'Cancellation reason', 2000);
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
   });
 
   if (!session) {
-    throw new Error('Session not found');
+    throw notFound('Session not found.');
   }
 
+  await requireSection(session.sectionId, user);
+
   if (session.status === 'CANCELLED') {
-    throw new Error('Session is already cancelled');
+    throw conflict('ALREADY_CANCELLED', 'Session is already cancelled.');
   }
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -182,14 +216,18 @@ async function cancelSession({ sessionId, reason, actorId }) {
 /**
  * List sessions with optional filters
  */
-async function getSessions({ sectionId, startDate, endDate, status }) {
+async function getSessions({ sectionId, startDate, endDate, status, user }) {
   const where = {};
+  if (user.role === 'FACULTY') where.section = { faculty: { some: { userId: user.id } } };
+  if (user.role === 'STUDENT') where.section = { enrollments: { some: { userId: user.id } } };
+  if (status && !['SCHEDULED', 'EXTRA', 'CANCELLED'].includes(status))
+    throw badRequest('Invalid session status.');
   if (sectionId) where.sectionId = sectionId;
   if (status) where.status = status;
   if (startDate || endDate) {
     where.date = {};
-    if (startDate) where.date.gte = new Date(startDate);
-    if (endDate) where.date.lte = new Date(endDate);
+    if (startDate) where.date.gte = dateOnly(startDate);
+    if (endDate) where.date.lte = dateOnly(endDate);
   }
 
   return prisma.session.findMany({
@@ -205,7 +243,39 @@ async function getSessions({ sectionId, startDate, endDate, status }) {
   });
 }
 
+async function saveTimetable({ sectionId, slots, user }) {
+  await requireSection(sectionId, user);
+  if (!Array.isArray(slots) || slots.length > 30) throw badRequest('Provide at most 30 weekly slots.');
+  slots = slots.map((s) => {
+    if (!s || !DAY_MAP.includes(s.dayOfWeek)) throw badRequest('Invalid day of week.');
+    validateTimes(s.startTime, s.endTime);
+    return { sectionId, dayOfWeek: s.dayOfWeek, startTime: s.startTime, endTime: s.endTime };
+  });
+  for (let i = 0; i < slots.length; i++)
+    for (let j = 0; j < i; j++) {
+      const a = slots[i],
+        b = slots[j];
+      if (a.dayOfWeek === b.dayOfWeek && a.startTime < b.endTime && b.startTime < a.endTime)
+        throw badRequest('Weekly slots cannot overlap.');
+    }
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM sections WHERE id=${sectionId} FOR UPDATE`;
+    await tx.timetableSlot.deleteMany({ where: { sectionId } });
+    await tx.timetableSlot.createMany({ data: slots });
+    await recordAuditLog({
+      actorId: user.id,
+      action: 'TIMETABLE_UPDATED',
+      entity: 'sections',
+      entityId: sectionId,
+      newValue: { slots },
+      tx,
+    });
+    return slots;
+  });
+}
+
 module.exports = {
+  saveTimetable,
   generateSessionsFromTimetable,
   addExtraSession,
   cancelSession,

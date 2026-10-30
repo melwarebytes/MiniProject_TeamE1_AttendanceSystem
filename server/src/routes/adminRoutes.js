@@ -24,6 +24,7 @@ router.get(
         orderBy: [{ semesterStart: 'desc' }, { id: 'asc' }],
         include: {
           course: true,
+          timetable: true,
           faculty: true,
           enrollments: { include: { periods: true, user: { select: users.publicFields } } },
         },
@@ -31,6 +32,19 @@ router.get(
       prisma.section.count({ where }),
     ]);
     res.json({ data, total, page: p, size });
+  }),
+);
+router.put(
+  '/sections/:id/timetable',
+  authorize('ADMIN', 'FACULTY'),
+  wrap(async (req, res) => {
+    res.json(
+      await require('../services/sessionService').saveTimetable({
+        sectionId: req.params.id,
+        slots: req.body.slots,
+        user: req.user,
+      }),
+    );
   }),
 );
 router.get(
