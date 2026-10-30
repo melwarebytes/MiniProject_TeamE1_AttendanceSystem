@@ -69,7 +69,7 @@ async function generateSessionsFromTimetable({ sectionId, actorId, user }) {
   });
 
   const sessionsToCreate = [];
-  const curr = dateOnly(startDate);
+  const curr = new Date(startDate);
 
   // Normalize time
   curr.setUTCHours(0, 0, 0, 0);
@@ -98,7 +98,7 @@ async function generateSessionsFromTimetable({ sectionId, actorId, user }) {
     curr.setUTCDate(curr.getUTCDate() + 1);
   }
 
-  // Delete existing scheduled sessions without attendance if regenerating, or simply create new
+  // Add missing sessions; never delete attendance when regenerating.
   const createdSessions = await prisma.$transaction(async (tx) => {
     // Serialize generation and extra sessions for the section; reruns preserve marks.
     await tx.$queryRaw`SELECT id FROM sections WHERE id=${sectionId} FOR UPDATE`;
