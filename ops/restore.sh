@@ -21,7 +21,20 @@ docker compose start api
 
 echo "Restored $FILE. Waiting for the API health check..."
 for _ in $(seq 1 30); do
-  if curl -fsS http://localhost:3000/api/v1/health >/dev/null; then docker compose start retention; echo "API healthy; retention worker restarted."; exit 0; fi
+  if curl -fsS http://localhost:3000/api/v1/health >/dev/null; then
+    docker compose start retention
+    # Nginx resolves the API container address on startup; refresh it after a stop/start.
+    docker compose restart client
+    for _ in $(seq 1 30); do
+      if curl -fsS http://localhost:5173/api/v1/health >/dev/null; then
+        echo "API and web proxy healthy; retention worker restarted."
+        exit 0
+      fi
+      sleep 2
+    done
+    echo "Web proxy did not recover; check: docker compose logs client"
+    exit 1
+  fi
   sleep 2
 done
 echo "API did not become healthy; check: docker compose logs api"; exit 1
