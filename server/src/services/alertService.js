@@ -44,6 +44,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
     },
   });
 
+  const courseSections = await prisma.section.findMany({ where: { courseId: section.courseId }, select: { id: true } });
   const alertsTriggered = [];
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -82,7 +83,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
         const recent = await tx.attendanceAlert.findFirst({
           where: {
             userId: student.id,
-            section: { courseId: section.courseId },
+            sectionId: { in: courseSections.map(s => s.id) },
             sentAt: { gte: sevenDaysAgo },
           },
         });
