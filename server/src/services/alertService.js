@@ -78,7 +78,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
       // Serialize the seven-day decision across sections of the same course.
       const newAlert = await prisma.$transaction(async (tx) => {
         const key = `${student.id}:${section.courseId}`;
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`;
         const recent = await tx.attendanceAlert.findFirst({
           where: {
             userId: student.id,

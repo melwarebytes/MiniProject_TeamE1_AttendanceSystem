@@ -77,7 +77,7 @@ test('leave rejects spoofed/oversized attachments and keeps accepted documents p
         contentType: 'application/pdf',
       })
     ).status,
-  ).toBe(400);
+  ).toBe(413);
   const result = await post().attach('document', Buffer.from('%PDF-1.4\n%%EOF'), {
     filename: 'note.pdf',
     contentType: 'application/pdf',
