@@ -67,7 +67,7 @@ cd client && npm ci && npm run dev      # http://localhost:5173, proxies /api to
 | Script | What it does |
 |---|---|
 | [`ops/backup.sh`](../ops/backup.sh) | `pg_dump` of the `sams` database → `backups/sams_<timestamp>.sql.gz`; deletes backups older than 30 days. Set `BACKUP_PASSPHRASE` to encrypt with AES-256 (SR-03). |
-| [`ops/restore.sh`](../ops/restore.sh) | Stops the API and retention worker, restores a chosen backup, starts the API and waits for health before restarting retention. Asks you to type `RESTORE` first. |
+| [`ops/restore.sh`](../ops/restore.sh) | Stops the API and retention worker, restores a chosen backup, starts the API, restarts retention and the web proxy, then verifies the proxied health URL. Asks you to type `RESTORE` first. |
 
 Nightly schedule on the host (02:15 every day):
 ```cron
@@ -145,7 +145,7 @@ counts as attended, matching SADS §8.2.
 The CI deployment job builds fresh images, starts an isolated Compose project,
 checks database/Redis/proxy health, runs the seed twice and compares row counts,
 backs up, changes a sentinel value, restores, and verifies both counts and data.
-It stops both API and retention writers during restore. A failed restore keeps
+It stops both API and retention writers during restore and refreshes the web proxy after the API returns. A failed restore keeps
 them stopped. The `sprint-release-evidence` artifact contains the drill logs,
 counts, health JSON, screenshots, report downloads and browser recordings from
 the real API. The CI database contains demo data only and is destroyed afterward.
