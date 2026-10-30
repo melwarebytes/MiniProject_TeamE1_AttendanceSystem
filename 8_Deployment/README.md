@@ -6,20 +6,22 @@ Three-tier web application (see [4_Architecture_and_Design](../4_Architecture_an
 | Container | Image | Purpose | Port |
 |---|---|---|---|
 | `client` | built from `client/Dockerfile` (Nginx) | Serves the web app; forwards `/api/` to the API | 5173 → 80 |
-| `api` | built from `server/Dockerfile` (Node 22) | REST API; applies migrations on start | 3000 |
+| `api` | built from `server/Dockerfile` (Node 22) | REST API using restricted `sams_app` credentials | 3000 |
+| `migrate` | same server image | One-shot migrations and role provisioning | internal |
+| `retention` | same server image | Scheduled data retention with a separate DB role | internal |
 | `postgres` | `postgres:15` | Main database (volume `pgdata`) | internal |
 | `redis` | `redis:7-alpine` | QR check-in windows, nonces and check-in locks | internal |
 
 ## Prerequisites
 - Docker and Docker Compose
-- Node.js 20.19+ (only for running without Docker)
+- Node.js 22.12+ (only for running without Docker)
 - Git
 
 ## Run with Docker
 ```bash
 git clone https://github.com/melwarebytes/MiniProject_TeamE1_AttendanceSystem
 cd MiniProject_TeamE1_AttendanceSystem
-cp .env.example .env              # set JWT_SECRET and QR_HMAC_SECRET (openssl rand -base64 48)
+cp .env.example .env              # set JWT_SECRET, QR_HMAC_SECRET, APP_DB_PASSWORD and RETENTION_DB_PASSWORD
 docker compose up --build -d
 docker compose exec api npm run seed   # demo accounts
 ```
@@ -32,8 +34,15 @@ docker compose exec api npm run seed   # demo accounts
 ## Run without Docker (development)
 Needs a local PostgreSQL and Redis.
 ```bash
-cd server && cp .env.example .env && npm install && npx prisma db push && npm run seed && npm run dev
-cd client && npm install && npm run dev      # http://localhost:5173, proxies /api to :3000
+cd server
+cp .env.example .env  # configure local PostgreSQL and Redis URLs
+npm ci
+npx prisma generate
+npm run migrate:deploy
+npm run seed
+npm run dev
+# In a second terminal from the repository root:
+cd client && npm ci && npm run dev      # http://localhost:5173, proxies /api to :3000
 ```
 
 ## Environment variables
@@ -50,7 +59,7 @@ cd client && npm install && npm run dev      # http://localhost:5173, proxies /a
 
 ## Health checks and restarts (NFR-03)
 - `GET /api/v1/health` returns `200 {"status":"ok"}` when the database and Redis both answer, and `503 {"status":"degraded"}` with the failing check otherwise.
-- Every container has a Docker health check and `restart: unless-stopped`, so a crashed container is restarted automatically. The client waits for a healthy API, and the API waits for healthy Postgres and Redis.
+- PostgreSQL, Redis and the API have Docker health checks; long-running services use `restart: unless-stopped`, so a crashed container is restarted automatically. The client waits for a healthy API, and the API waits for healthy Postgres and Redis.
 - The API shuts down gracefully on `SIGTERM` (finishes in-flight requests, then closes database and Redis connections).
 - For uptime monitoring (99.5% target), point any HTTP monitor at the health URL with a 1-minute interval.
 
@@ -58,7 +67,7 @@ cd client && npm install && npm run dev      # http://localhost:5173, proxies /a
 | Script | What it does |
 |---|---|
 | [`ops/backup.sh`](../ops/backup.sh) | `pg_dump` of the `sams` database → `backups/sams_<timestamp>.sql.gz`; deletes backups older than 30 days. Set `BACKUP_PASSPHRASE` to encrypt with AES-256 (SR-03). |
-| [`ops/restore.sh`](../ops/restore.sh) | Stops the API, restores a chosen backup, starts the API and waits for the health check. Asks you to type `RESTORE` first. |
+| [`ops/restore.sh`](../ops/restore.sh) | Stops the API and retention worker, restores a chosen backup, starts the API and waits for health before restarting retention. Asks you to type `RESTORE` first. |
 
 Nightly schedule on the host (02:15 every day):
 ```cron
@@ -130,3 +139,19 @@ has a user-bound 15-minute snapshot; CSV/PDF exports read that exact snapshot so
 subsequent attendance edits cannot silently change downloaded figures. Regenerate
 an expired report to export again. Cancelled sessions are excluded and EXCUSED
 counts as attended, matching SADS §8.2.
+
+## Repeatable release drill
+
+The CI deployment job builds fresh images, starts an isolated Compose project,
+checks database/Redis/proxy health, runs the seed twice and compares row counts,
+backs up, changes a sentinel value, restores, and verifies both counts and data.
+It stops both API and retention writers during restore. A failed restore keeps
+them stopped. The `sprint-release-evidence` artifact contains the drill logs,
+counts, health JSON, screenshots, report downloads and browser recordings from
+the real API. The CI database contains demo data only and is destroyed afterward.
+
+Pilot rollout still needs a deployment hostname, TLS termination, real secrets,
+SMTP configuration and a host backup schedule. Set `COOKIE_SECURE=true` behind
+HTTPS. Run the load test on the pilot's specified 4-vCPU/8-GB host and record its
+results before admitting real students. Existing-database baseline checks above
+remain required; the fresh-database CI drill does not validate an unknown existing database.
