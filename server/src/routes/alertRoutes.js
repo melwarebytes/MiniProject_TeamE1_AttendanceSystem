@@ -45,6 +45,7 @@ router.post(
   authorize('ADMIN', 'FACULTY'),
   async (req, res, next) => {
     try {
+      await alertService.listStudentsBelowThreshold(req.params.sectionId, req.user);
       const alerts = await alertService.checkAndTriggerAlertsForSection(req.params.sectionId);
       res.json({ message: `Triggered alert checks. ${alerts.length} new alerts sent.`, alerts });
     } catch (err) {

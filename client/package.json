@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "jsqr": "^1.4.0",
@@ -17,11 +18,14 @@
     "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
+    "selenium-webdriver": "^4.51.0",
     "tailwindcss": "^3.4.17",
     "vite": "^5.0.0"
   }

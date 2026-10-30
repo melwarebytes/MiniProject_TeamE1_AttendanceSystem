@@ -4,9 +4,10 @@ const prisma = require('../src/utils/prisma');
 
 async function main() {
   console.log('Seeding SAMS Database...');
+  await prisma.policy.upsert({ where: { id: 'institution' }, create: {}, update: {} });
 
   // 1. Create Users
-  const passwordHash = await bcrypt.hash('Password123!', 10);
+  const passwordHash = await bcrypt.hash('Password123!', 12);
 
   await prisma.user.upsert({
     where: { email: 'admin@pes.edu' },
@@ -85,7 +86,8 @@ async function main() {
 
   const sectionA = await prisma.section.upsert({
     where: {
-      courseId_name: {
+      courseId_name_semesterStart: {
+        semesterStart,
         courseId: seCourse.id,
         name: 'A',
       },
@@ -166,7 +168,8 @@ async function main() {
     const sessionDate = new Date();
     sessionDate.setDate(today.getDate() - (6 - i));
 
-    const sess = await prisma.session.create({
+    sessionDate.setUTCHours(0, 0, 0, 0);
+    const sess = await prisma.session.findFirst({ where: { sectionId: sectionA.id, date: sessionDate, startTime: '09:00', endTime: '10:00' } }) || await prisma.session.create({
       data: {
         sectionId: sectionA.id,
         date: sessionDate,
@@ -177,8 +180,10 @@ async function main() {
     });
 
     // Mark 4 present and 1 absent for Bhuvan (80% attendance)
-    await prisma.attendanceRecord.create({
-      data: {
+    await prisma.attendanceRecord.upsert({
+      where: { enrollmentId_sessionId: { sessionId: sess.id, enrollmentId: bhuvanEnrollment.id } },
+      update: {},
+      create: {
         enrollmentId: bhuvanEnrollment.id,
         sessionId: sess.id,
         status: i === 3 ? 'ABSENT' : 'PRESENT',

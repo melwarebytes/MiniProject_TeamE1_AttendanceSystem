@@ -110,7 +110,7 @@ export default function AuditLog() {
 
       {error && <div role="alert" className="p-4 bg-red-50 text-red-800 rounded-lg text-sm">{error}</div>}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+      <div role="region" aria-label="Scrollable table" tabIndex={0} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Audit log entries, newest first</caption>
           <thead>

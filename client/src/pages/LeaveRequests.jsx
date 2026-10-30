@@ -80,7 +80,8 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <h1 className="text-2xl font-bold text-gray-800">Leave / Excused Absence Requests (FR-10)</h1>
         <p className="text-sm text-gray-500">
-          Submit absence requests with supporting medical/institutional documentation (up to 5MB). Approved leaves convert ABSENT records to EXCUSED.
+          Submit absence requests with supporting medical/institutional documentation (up to 5MB). Approved
+          leaves convert ABSENT records to EXCUSED.
         </p>
       </div>
 
@@ -94,8 +95,11 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-semibold text-gray-600">Section ID *</label>
+                <label htmlFor="LeaveRequests-field-1" className="text-xs font-semibold text-gray-600">
+                  Section ID *
+                </label>
                 <input
+                  id="LeaveRequests-field-1"
                   type="text"
                   placeholder="e.g. Section UUID"
                   value={form.sectionId}
@@ -105,8 +109,11 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600">Start Date *</label>
+                <label htmlFor="LeaveRequests-field-2" className="text-xs font-semibold text-gray-600">
+                  Start Date *
+                </label>
                 <input
+                  id="LeaveRequests-field-2"
                   type="date"
                   value={form.startDate}
                   onChange={(e) => setForm({ ...form, startDate: e.target.value })}
@@ -115,8 +122,11 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600">End Date *</label>
+                <label htmlFor="LeaveRequests-field-3" className="text-xs font-semibold text-gray-600">
+                  End Date *
+                </label>
                 <input
+                  id="LeaveRequests-field-3"
                   type="date"
                   value={form.endDate}
                   onChange={(e) => setForm({ ...form, endDate: e.target.value })}
@@ -127,8 +137,11 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-gray-600">Reason for Absence *</label>
+              <label htmlFor="LeaveRequests-field-4" className="text-xs font-semibold text-gray-600">
+                Reason for Absence *
+              </label>
               <textarea
+                id="LeaveRequests-field-4"
                 placeholder="Explain the medical reason, university event, or emergency..."
                 value={form.reason}
                 onChange={(e) => setForm({ ...form, reason: e.target.value })}
@@ -139,8 +152,11 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-gray-600">Supporting Document (PDF, JPG, PNG ≤ 5MB)</label>
+              <label htmlFor="LeaveRequests-field-5" className="text-xs font-semibold text-gray-600">
+                Supporting Document (PDF, JPG, PNG ≤ 5MB)
+              </label>
               <input
+                id="LeaveRequests-field-5"
                 type="file"
                 accept=".pdf,image/jpeg,image/png"
                 onChange={(e) => setForm({ ...form, file: e.target.files[0] || null })}
@@ -195,14 +211,25 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
                   <td className="py-3 px-4 text-xs text-gray-700 max-w-xs">{l.reason}</td>
                   <td className="py-3 px-4 text-xs">
                     {l.documentPath ? (
-                      <a
-                        href={`/${l.documentPath}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-indigo-600 hover:underline font-semibold"
+                      <button
+                        type="button"
+                        className="text-indigo-700 underline"
+                        onClick={async () => {
+                          try {
+                            const response = await api.request(`/leave/${l.id}/document`);
+                            const url = URL.createObjectURL(await response.blob());
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = 'leave-document';
+                            link.click();
+                            setTimeout(() => URL.revokeObjectURL(url), 1000);
+                          } catch (err) {
+                            setError(err.message);
+                          }
+                        }}
                       >
-                        View Proof
-                      </a>
+                        Download document
+                      </button>
                     ) : (
                       <span className="text-gray-400">None</span>
                     )}
@@ -213,8 +240,8 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
                         l.status === 'APPROVED'
                           ? 'bg-emerald-100 text-emerald-800'
                           : l.status === 'REJECTED'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-amber-100 text-amber-800'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-amber-100 text-amber-800'
                       }`}
                     >
                       {l.status}
@@ -226,7 +253,7 @@ export default function LeaveRequests({ userRole = 'STUDENT' }) {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleReview(l.id, 'APPROVE')}
-                            className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded"
+                            className="text-xs px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded"
                           >
                             Approve
                           </button>

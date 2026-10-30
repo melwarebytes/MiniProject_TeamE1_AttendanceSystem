@@ -1,40 +1,39 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
-
+const fs = require('fs/promises');
+const crypto = require('crypto');
+const { badRequest } = require('../utils/errors');
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || 'uploads');
-
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+const receive = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+function mimeFor(buffer) {
+  if (buffer.subarray(0, 5).toString() === '%PDF-') return ['application/pdf', '.pdf'];
+  if (buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
+    return ['image/png', '.png'];
+  if (buffer.length > 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255)
+    return ['image/jpeg', '.jpg'];
+  return null;
 }
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
+module.exports = {
+  single(field) {
+    return (req, res, next) =>
+      receive.single(field)(req, res, async (error) => {
+        if (error) return next(error);
+        if (!req.file) return next();
+        try {
+          const detected = mimeFor(req.file.buffer);
+          if (!detected) throw badRequest('Only PDF, JPG and PNG file content is accepted.');
+          const declared = req.file.mimetype === 'image/jpg' ? 'image/jpeg' : req.file.mimetype;
+          if (declared !== detected[0])
+            throw badRequest('Attachment content does not match its declared type.');
+          await fs.mkdir(uploadDir, { recursive: true });
+          const filename = crypto.randomUUID() + detected[1];
+          const filePath = path.join(uploadDir, filename);
+          await fs.writeFile(filePath, req.file.buffer, { flag: 'wx', mode: 0o600 });
+          req.file = { path: filePath, mimetype: detected[0], filename };
+          next();
+        } catch (err) {
+          next(err);
+        }
+      });
   },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `leave-doc-${uniqueSuffix}${ext}`);
-  },
-});
-
-const ALLOWED_MIMES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-
-const fileFilter = (req, file, cb) => {
-  if (ALLOWED_MIMES.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only PDF, JPG, and PNG documents up to 5MB are permitted.'));
-  }
 };
-
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB
-  },
-  fileFilter,
-});
-
-module.exports = upload;

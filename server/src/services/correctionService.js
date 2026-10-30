@@ -1,20 +1,20 @@
 const prisma = require('../utils/prisma');
 const { recordAuditLog } = require('./auditService');
 const { isFacultyAssigned } = require('./attendanceService');
+const { conflict, badRequest } = require('../utils/errors');
+const { sessionInstant } = require('./membershipService');
 
 /**
  * Check if the session is still within the direct edit window
  */
 function isWithinEditWindow(sessionDate, endTime, editWindowHours = 48) {
-  const [endHour, endMin] = endTime.split(':').map(Number);
-  const sessionEnd = new Date(sessionDate);
-  sessionEnd.setHours(endHour, endMin, 0, 0);
+  const sessionEnd = sessionInstant({ date: sessionDate, startTime: endTime });
 
   const now = new Date();
   const diffMs = now - sessionEnd;
   const maxDiffMs = editWindowHours * 60 * 60 * 1000;
 
-  return diffMs <= maxDiffMs;
+  return diffMs >= 0 && diffMs <= maxDiffMs;
 }
 
 /**
@@ -46,11 +46,11 @@ async function correctAttendanceDirectly({ attendanceRecordId, newStatus, reason
     }
 
     // Check edit window
-    const windowHours = record.session.section.editWindowHours || 48;
+    const windowHours = record.session.section.editWindowHours ?? 48;
     const allowed = isWithinEditWindow(record.session.date, record.session.endTime, windowHours);
     if (!allowed) {
       const err = new Error(
-        `Direct edit window of ${windowHours} hours has expired. Please submit an attendance correction request for Admin approval.`
+        `Direct edit window of ${windowHours} hours has expired. Please submit an attendance correction request for Admin approval.`,
       );
       err.status = 400;
       err.code = 'EDIT_WINDOW_EXPIRED';
@@ -93,7 +93,9 @@ async function correctAttendanceDirectly({ attendanceRecordId, newStatus, reason
  * FR-08: Submit a formal correction request (used after edit window has passed)
  */
 async function submitCorrectionRequest({ attendanceRecordId, newStatus, reason, user }) {
-  if (!reason || reason.trim().length === 0) {
+  if (!['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'].includes(newStatus))
+    throw badRequest('Invalid attendance status.');
+  if (typeof reason !== 'string' || reason.trim().length === 0 || reason.length > 2000) {
     const err = new Error('A valid reason is required for correction requests');
     err.status = 400;
     throw err;
@@ -106,7 +108,7 @@ async function submitCorrectionRequest({ attendanceRecordId, newStatus, reason, 
         include: { section: true },
       },
       enrollment: {
-        include: { user: true },
+        include: { user: { select: { id: true, name: true, srn: true, email: true } } },
       },
     },
   });
@@ -145,7 +147,7 @@ async function submitCorrectionRequest({ attendanceRecordId, newStatus, reason, 
         attendanceRecord: {
           include: {
             session: true,
-            enrollment: { include: { user: true } },
+            enrollment: { include: { user: { select: { id: true, name: true, srn: true, email: true } } } },
           },
         },
         requestedBy: {
@@ -251,6 +253,11 @@ async function reviewCorrectionRequest({ requestId, action, reviewNote, adminUse
   const newStatus = isApproved ? 'APPROVED' : 'REJECTED';
 
   const updated = await prisma.$transaction(async (tx) => {
+    const claim = await tx.correctionRequest.updateMany({
+      where: { id: requestId, status: 'PENDING' },
+      data: { status: newStatus },
+    });
+    if (!claim.count) throw conflict('ALREADY_REVIEWED', 'This request has already been reviewed.');
     // If approved, update attendance record
     if (isApproved) {
       await tx.attendanceRecord.update({
@@ -271,7 +278,7 @@ async function reviewCorrectionRequest({ requestId, action, reviewNote, adminUse
       },
       include: {
         attendanceRecord: true,
-        requestedBy: true,
+        requestedBy: { select: { id: true, name: true, email: true } },
       },
     });
 

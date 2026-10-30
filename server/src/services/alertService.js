@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { eligibleForSession, sessionInstant } = require('./membershipService');
 const { calculateMetrics } = require('./dashboardService');
 const { sendEmail } = require('../utils/mailer');
 const { recordAuditLog } = require('./auditService');
@@ -25,7 +26,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
   const now = new Date();
 
   // Find enrolled students to check
-  const enrollmentWhere = { sectionId };
+  const enrollmentWhere = { sectionId, user: { active: true } };
   if (specificStudentId) {
     enrollmentWhere.userId = specificStudentId;
   }
@@ -34,6 +35,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
     where: enrollmentWhere,
     include: {
       user: true,
+      periods: true,
       attendanceRecords: {
         where: {
           session: { status: { not: 'CANCELLED' } },
@@ -42,6 +44,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
     },
   });
 
+  const courseSections = await prisma.section.findMany({ where: { courseId: section.courseId }, select: { id: true } });
   const alertsTriggered = [];
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -57,8 +60,9 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
     let held = 0;
 
     section.sessions.forEach((sess) => {
+      if (!eligibleForSession(enr, sess)) return;
       const rec = recordsMap.get(sess.id);
-      const isPastOrMarked = new Date(sess.date) <= now || !!rec;
+      const isPastOrMarked = sessionInstant(sess) <= now || !!rec;
       if (isPastOrMarked) {
         held += 1;
         if (rec && ['PRESENT', 'LATE', 'EXCUSED'].includes(rec.status)) {
@@ -72,20 +76,19 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
     const metrics = calculateMetrics({ attended, held, threshold });
 
     if (metrics.isLowAttendance) {
-      // Check 7-day rate limit for this student & section
-      const recentAlert = await prisma.attendanceAlert.findFirst({
-        where: {
-          userId: student.id,
-          sectionId: section.id,
-          sentAt: {
-            gte: sevenDaysAgo,
+      // Serialize the seven-day decision across sections of the same course.
+      const newAlert = await prisma.$transaction(async (tx) => {
+        const key = `${student.id}:${section.courseId}`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`;
+        const recent = await tx.attendanceAlert.findFirst({
+          where: {
+            userId: student.id,
+            sectionId: { in: courseSections.map(s => s.id) },
+            sentAt: { gte: sevenDaysAgo },
           },
-        },
-      });
-
-      if (!recentAlert) {
-        // Create in-app alert record
-        const newAlert = await prisma.attendanceAlert.create({
+        });
+        if (recent) return null;
+        const created = await tx.attendanceAlert.create({
           data: {
             userId: student.id,
             sectionId: section.id,
@@ -94,7 +97,17 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
             sentAt: new Date(),
           },
         });
-
+        await recordAuditLog({
+          actorId: null,
+          action: 'LOW_ATTENDANCE_ALERT_TRIGGERED',
+          entity: 'attendance_alerts',
+          entityId: created.id,
+          newValue: { userId: student.id, sectionId: section.id, percentage: metrics.percentage, threshold },
+          tx,
+        });
+        return created;
+      });
+      if (newAlert) {
         alertsTriggered.push(newAlert);
 
         // Send email alert
@@ -104,20 +117,7 @@ async function checkAndTriggerAlertsForSection(sectionId, specificStudentId = nu
           to: student.email,
           subject: `Low Attendance Warning: ${section.course.code} (${metrics.percentage}%)`,
           text: emailBody,
-        });
-
-        await recordAuditLog({
-          actorId: null, // System event
-          action: 'LOW_ATTENDANCE_ALERT_TRIGGERED',
-          entity: 'attendance_alerts',
-          entityId: newAlert.id,
-          newValue: {
-            userId: student.id,
-            sectionId: section.id,
-            percentage: metrics.percentage,
-            threshold,
-          },
-        });
+        }).catch((error) => require('../utils/logger').error('Alert email failed', error));
       }
     }
   }
@@ -165,6 +165,7 @@ async function listStudentsBelowThreshold(sectionId, user) {
   const enrollments = await prisma.enrollment.findMany({
     where: { sectionId },
     include: {
+      periods: true,
       user: {
         select: { id: true, name: true, srn: true, email: true },
       },
@@ -188,8 +189,9 @@ async function listStudentsBelowThreshold(sectionId, user) {
     let held = 0;
 
     section.sessions.forEach((sess) => {
+      if (!eligibleForSession(enr, sess)) return;
       const rec = recordsMap.get(sess.id);
-      const isPastOrMarked = new Date(sess.date) <= now || !!rec;
+      const isPastOrMarked = sessionInstant(sess) <= now || !!rec;
       if (isPastOrMarked) {
         held += 1;
         if (rec && ['PRESENT', 'LATE', 'EXCUSED'].includes(rec.status)) {

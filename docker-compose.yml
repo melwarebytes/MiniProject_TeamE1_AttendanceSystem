@@ -26,6 +26,31 @@ services:
       timeout: 3s
       retries: 10
 
+  migrate:
+    build: ./server
+    env_file: .env
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://sams:${POSTGRES_PASSWORD:-sams}@postgres:5432/sams
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD (16+ characters)}
+      RETENTION_DB_PASSWORD: ${RETENTION_DB_PASSWORD:?Set RETENTION_DB_PASSWORD (16+ characters)}
+    command: ["npm", "run", "bootstrap"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  retention:
+    build: ./server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      RETENTION_DATABASE_URL: postgresql://sams_retention:${RETENTION_DB_PASSWORD}@postgres:5432/sams
+    command: ["npm", "run", "retention"]
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   api:
     build: ./server
     restart: unless-stopped
@@ -33,12 +58,14 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://sams:${POSTGRES_PASSWORD:-sams}@postgres:5432/sams?schema=public
+      DATABASE_URL: postgresql://sams_app:${APP_DB_PASSWORD}@postgres:5432/sams?schema=public
       REDIS_URL: redis://redis:6379
       APP_URL: ${APP_URL:-http://localhost:5173}
     volumes:
       - uploads:/app/uploads
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
