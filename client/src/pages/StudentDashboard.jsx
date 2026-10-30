@@ -44,7 +44,7 @@ export default function StudentDashboard() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Welcome, {student.name}</h1>
           <p className="text-sm text-gray-500">SRN: {student.srn || 'N/A'} • {student.email}</p>
@@ -84,6 +84,8 @@ export default function StudentDashboard() {
           return (
             <div
               key={course.courseId}
+              role="button" tabIndex={0} aria-pressed={isSelected}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCourse(course); } }}
               onClick={() => setSelectedCourse(course)}
               className={`cursor-pointer transition-all duration-200 bg-white p-5 rounded-xl border-2 shadow-sm ${
                 isSelected
@@ -155,7 +157,7 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div role="region" aria-label="Scrollable table" tabIndex={0} className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-600 text-xs uppercase font-semibold">

@@ -9,5 +9,5 @@ RUN npx prisma generate
 RUN mkdir -p uploads && chown -R node:node /app
 USER node
 EXPOSE 3000
-# Sync the database schema, then start the API
-CMD ["sh", "-c", "npx prisma db push && node src/index.js"]
+# Schema changes run in the separate migration service.
+CMD ["node", "src/index.js"]

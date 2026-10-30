@@ -1,4 +1,6 @@
 const prisma = require('../utils/prisma');
+const { eligibleForSession, sessionInstant } = require('./membershipService');
+const { badRequest } = require('../utils/errors');
 const { recordAuditLog } = require('./auditService');
 
 /**
@@ -67,6 +69,7 @@ async function getSessionRoster(sessionId, user) {
   const enrollments = await prisma.enrollment.findMany({
     where: { sectionId: session.sectionId },
     include: {
+      periods: true,
       user: {
         select: { id: true, name: true, srn: true, email: true },
       },
@@ -84,7 +87,7 @@ async function getSessionRoster(sessionId, user) {
   });
 
   // Construct roster with default PRESENT
-  const roster = enrollments.map((enr) => {
+  const roster = enrollments.filter(e => eligibleForSession(e, session)).map((enr) => {
     const existing = existingRecordsMap.get(enr.id);
     return {
       enrollmentId: enr.id,
@@ -121,14 +124,9 @@ async function getSessionRoster(sessionId, user) {
 function validateMarkingWindow(sessionDate, startTime, overrideTime = null) {
   const now = overrideTime ? new Date(overrideTime) : new Date();
 
-  // Construct session start DateTime
-  const [startHour, startMin] = startTime.split(':').map(Number);
-  const sessionStart = new Date(sessionDate);
-  sessionStart.setHours(startHour, startMin, 0, 0);
-
-  // Construct session day end DateTime (23:59:59.999)
-  const sessionDayEnd = new Date(sessionDate);
-  sessionDayEnd.setHours(23, 59, 59, 999);
+  // Session times are institutional IST regardless of the server timezone.
+  const sessionStart = sessionInstant({ date: sessionDate, startTime });
+  const sessionDayEnd = new Date(+sessionInstant({ date: sessionDate, startTime: '23:59' }) + 59999);
 
   if (now < sessionStart) {
     const err = new Error('Attendance marking is only allowed from session start time onward');
@@ -183,6 +181,12 @@ async function submitAttendanceRoster({ sessionId, records, user, bypassTimeWind
   // Check marking time window unless bypassed by test or admin
   if (!bypassTimeWindow && user.role !== 'ADMIN') {
     validateMarkingWindow(session.date, session.startTime);
+  }
+
+  const enrolled = await prisma.enrollment.findMany({ where: { sectionId: session.sectionId }, include: { periods: true } });
+  const eligible = new Set(enrolled.filter(e => eligibleForSession(e, session)).map(e => e.id));
+  if (records.length > 300 || new Set(records.map(r => r?.enrollmentId)).size !== records.length || records.some(r => !r || !eligible.has(r.enrollmentId) || !['PRESENT', 'LATE', 'ABSENT'].includes(r.status))) {
+    throw badRequest('Records must contain unique eligible enrolments and PRESENT, LATE or ABSENT statuses.');
   }
 
   // Atomic transaction to save all records + audit log

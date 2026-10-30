@@ -119,7 +119,7 @@ export default function CorrectionRequests({ userRole = 'ADMIN' }) {
                                   reviewNote: '',
                                 })
                               }
-                              className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded"
+                              className="text-xs px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded"
                             >
                               Approve
                             </button>
@@ -155,7 +155,7 @@ export default function CorrectionRequests({ userRole = 'ADMIN' }) {
             <h3 className="text-lg font-bold text-gray-800">
               {reviewModal.action === 'APPROVE' ? 'Approve Correction Request' : 'Reject Correction Request'}
             </h3>
-            <textarea
+            <textarea aria-label="Review note"
               placeholder="Review notes (optional)"
               value={reviewModal.reviewNote}
               onChange={(e) => setReviewModal({ ...reviewModal, reviewNote: e.target.value })}

@@ -81,6 +81,7 @@ export default function QrSession() {
   async function choose(session) {
     setError(null);
     setSelected(session);
+    setMinutes(session.qrWindowMinutes ?? 5);
     setQrImage(null);
     setWindowEnds(null);
     const s = await api.qrStatus(session.id).catch(() => null);
