@@ -1,5 +1,5 @@
 const prisma = require('../utils/prisma');
-const { eligibleForSession } = require('./membershipService');
+const { eligibleForSession, sessionInstant } = require('./membershipService');
 const { badRequest } = require('../utils/errors');
 const { recordAuditLog } = require('./auditService');
 
@@ -124,14 +124,9 @@ async function getSessionRoster(sessionId, user) {
 function validateMarkingWindow(sessionDate, startTime, overrideTime = null) {
   const now = overrideTime ? new Date(overrideTime) : new Date();
 
-  // Construct session start DateTime
-  const [startHour, startMin] = startTime.split(':').map(Number);
-  const sessionStart = new Date(sessionDate);
-  sessionStart.setHours(startHour, startMin, 0, 0);
-
-  // Construct session day end DateTime (23:59:59.999)
-  const sessionDayEnd = new Date(sessionDate);
-  sessionDayEnd.setHours(23, 59, 59, 999);
+  // Session times are institutional IST regardless of the server timezone.
+  const sessionStart = sessionInstant({ date: sessionDate, startTime });
+  const sessionDayEnd = new Date(+sessionInstant({ date: sessionDate, startTime: '23:59' }) + 59999);
 
   if (now < sessionStart) {
     const err = new Error('Attendance marking is only allowed from session start time onward');

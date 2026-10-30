@@ -181,7 +181,7 @@ async function main() {
 
     // Mark 4 present and 1 absent for Bhuvan (80% attendance)
     await prisma.attendanceRecord.upsert({
-      where: { sessionId_enrollmentId: { sessionId: sess.id, enrollmentId: bhuvanEnrollment.id } },
+      where: { enrollmentId_sessionId: { sessionId: sess.id, enrollmentId: bhuvanEnrollment.id } },
       update: {},
       create: {
         enrollmentId: bhuvanEnrollment.id,
