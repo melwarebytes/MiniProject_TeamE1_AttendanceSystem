@@ -182,7 +182,7 @@ export default function StudentDashboard() {
                       <td className="py-2.5 px-3 text-gray-500">{s.startTime} - {s.endTime}</td>
                       <td className="py-2.5 px-3">
                         <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">
-                          {s.sessionStatus}
+                          {s.sessionStatus === 'SCHEDULED' && s.markedAt ? 'HELD' : s.sessionStatus}
                         </span>
                       </td>
                       <td className="py-2.5 px-3">
