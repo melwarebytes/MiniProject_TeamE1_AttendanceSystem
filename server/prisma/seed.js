@@ -180,15 +180,16 @@ async function main() {
     });
 
     // Mark 4 present and 1 absent for Bhuvan (80% attendance)
+    const markedAt = new Date(sessionDate.getTime() + (3 * 60 + 35) * 60 * 1000); // 09:05 IST
     await prisma.attendanceRecord.upsert({
       where: { enrollmentId_sessionId: { sessionId: sess.id, enrollmentId: bhuvanEnrollment.id } },
-      update: {},
+      update: { markedAt },
       create: {
         enrollmentId: bhuvanEnrollment.id,
         sessionId: sess.id,
         status: i === 3 ? 'ABSENT' : 'PRESENT',
         markedById: faculty.id,
-        markedAt: sessionDate,
+        markedAt,
       },
     });
   }
