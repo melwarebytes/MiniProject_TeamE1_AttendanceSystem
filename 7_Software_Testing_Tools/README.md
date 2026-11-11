@@ -59,6 +59,9 @@ The user request to Codex was to fix Raj's assigned issues and complete the spri
 | Concurrent checks could duplicate low-attendance alerts | Per-student/course transaction lock and seven-day check | Concurrent alert test |
 | Repeated demo seeding added sessions | Reuse dated sessions and upsert attendance | Deployment seed-count comparison |
 | Restore left another database writer running | Stop API and retention, restart after successful restore | Disposable restore drill |
+| QR check-in compared session dates with the server's UTC date: 00:00–05:30 IST listed yesterday's classes and refused today's (FR-07) | Compare with the IST calendar day; load-test QR fixture uses the IST day | `qrDate.test.js` (clock pinned to 00:30 IST) |
+| Audit-log date filters used UTC days, so an IST day's search missed 00:00–05:30 IST and included the next morning (FR-13) | Bare dates are whole IST days | `audit.test.js` IST-day filter case |
+| `restore.sh` probed the API on host port 3000, so a remapped port left the API up but retention stopped (NFR-03) | Probe inside the API container; `WEB_URL` overridable | 12 Nov restore drill |
 
 ## Release handoff
 
