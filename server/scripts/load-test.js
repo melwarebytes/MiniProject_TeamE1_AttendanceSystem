@@ -82,7 +82,7 @@ async function main() {
       })),
     });
   const qrSession = await prisma.session.create({
-    data: { sectionId: section.id, date: today, startTime: '00:00', endTime: '23:59' },
+    data: { sectionId: section.id, date: istToday, startTime: '00:00', endTime: '23:59' },
   });
   const sign = (user) =>
     jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
