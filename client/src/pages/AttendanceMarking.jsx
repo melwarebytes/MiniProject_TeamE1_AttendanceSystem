@@ -19,9 +19,15 @@ export default function AttendanceMarking() {
     try {
       const data = await api.getSessions();
       setSessions(data.sessions || []);
-      if (data.sessions && data.sessions.length > 0) {
-        setSelectedSessionId(data.sessions[0].id);
-        fetchRoster(data.sessions[0].id);
+      const list = (data.sessions || []).filter((s) => s.status !== 'CANCELLED');
+      if (list.length > 0) {
+        // Default to today's class, else the most recent past one (list is date-ascending).
+        const today = new Date().toLocaleDateString('en-CA');
+        const pick = list.find((s) => s.date.slice(0, 10) === today)
+          || [...list].reverse().find((s) => s.date.slice(0, 10) <= today)
+          || list[0];
+        setSelectedSessionId(pick.id);
+        fetchRoster(pick.id);
       }
     } catch (err) {
       setError(err.message);
