@@ -21,12 +21,13 @@ docker compose start api
 
 echo "Restored $FILE. Waiting for the API health check..."
 for _ in $(seq 1 30); do
-  if curl -fsS http://localhost:3000/api/v1/health >/dev/null; then
+  # Probe inside the container (same check as the compose healthcheck), so a remapped host port doesn't matter.
+  if docker compose exec -T api node -e "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
     docker compose start retention
     # Nginx resolves the API container address on startup; refresh it after a stop/start.
     docker compose restart client
     for _ in $(seq 1 30); do
-      if curl -fsS http://localhost:5173/api/v1/health >/dev/null; then
+      if curl -fsS "${WEB_URL:-http://localhost:5173}/api/v1/health" >/dev/null; then
         echo "API and web proxy healthy; retention worker restarted."
         exit 0
       fi
