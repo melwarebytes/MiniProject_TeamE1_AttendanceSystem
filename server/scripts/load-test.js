@@ -50,6 +50,8 @@ async function main() {
   }));
   await prisma.user.createMany({ data: students });
   const today = new Date();
+  // Sessions are IST calendar days; after 18:30 UTC the UTC date is still yesterday in IST.
+  const istToday = new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(today)}T00:00:00Z`);
   today.setUTCHours(0, 0, 0, 0);
   const course = await prisma.course.create({ data: { code: tag, name: 'Load fixture' } });
   const section = await prisma.section.create({
@@ -80,7 +82,7 @@ async function main() {
       })),
     });
   const qrSession = await prisma.session.create({
-    data: { sectionId: section.id, date: today, startTime: '00:00', endTime: '23:59' },
+    data: { sectionId: section.id, date: istToday, startTime: '00:00', endTime: '23:59' },
   });
   const sign = (user) =>
     jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
@@ -133,7 +135,7 @@ async function main() {
   qr.durationSeconds = Number(((performance.now() - burstStart) / 1000).toFixed(2));
   qr.errorRate = qr.errors / qr.requests;
   const rosterSession = await prisma.session.create({
-    data: { sectionId: section.id, date: today, startTime: '00:00', endTime: '23:59' },
+    data: { sectionId: section.id, date: istToday, startTime: '00:00', endTime: '23:59' },
   });
   const roster = await http(`/attendance/roster/${rosterSession.id}`, facultyToken, {
     records: enrollments.slice(0, 200).map((e) => ({ enrollmentId: e.id, status: 'PRESENT' })),
