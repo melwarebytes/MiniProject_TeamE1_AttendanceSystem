@@ -37,8 +37,13 @@ async function connected() {
   }
 }
 
-function isSameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+// Session dates are IST calendar days stored at UTC midnight; compare against today's IST date,
+// not the server's local date (containers run in UTC, which is a day behind 00:00–05:30 IST).
+function istToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+}
+function isTodayIst(sessionDate) {
+  return new Date(sessionDate).toISOString().slice(0, 10) === istToday();
 }
 
 async function loadSessionFor(sessionId, user) {
@@ -64,7 +69,7 @@ async function openWindow(sessionId, minutes, user, ip) {
     throw badRequest(`Window length must be between ${MIN_WINDOW_MIN} and ${MAX_WINDOW_MIN} minutes.`);
   }
   if (session.status === 'CANCELLED') throw new AppError(409, 'SESSION_CANCELLED', 'This session was cancelled.');
-  if (!isSameDay(new Date(session.date), new Date())) {
+  if (!isTodayIst(session.date)) {
     throw new AppError(409, 'SESSION_NOT_TODAY', 'QR check-in can only be opened on the day of the class.');
   }
 
@@ -175,11 +180,7 @@ async function checkIn(token, student, ip) {
 
 /** Today's classes for the signed-in faculty member (all classes for admins). */
 async function todaysSessions(user) {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setHours(23, 59, 59, 999);
-  const where = { date: { gte: start, lte: end }, status: { not: 'CANCELLED' } };
+  const where = { date: new Date(`${istToday()}T00:00:00Z`), status: { not: 'CANCELLED' } };
   if (user.role === 'FACULTY') where.section = { faculty: { some: { userId: user.id } } };
   const sessions = await prisma.session.findMany({
     where,
@@ -200,4 +201,4 @@ async function todaysSessions(user) {
   );
 }
 
-module.exports = { openWindow, closeWindow, issueToken, status, checkIn, todaysSessions, TOKEN_TTL_S };
+module.exports = { istToday, openWindow, closeWindow, issueToken, status, checkIn, todaysSessions, TOKEN_TTL_S };

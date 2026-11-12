@@ -79,6 +79,7 @@ Copy the `backups/` folder off the server (for example with `rclone` or `rsync`)
 | Date | Backup size | Result |
 |---|---|---|
 | 28 Oct 2026 | 11 KB (gzip) | Dump restored into an empty database; user, attendance-record and audit-log counts matched the source exactly. |
+| 12 Nov 2026 | 12 KB (gzip) | `ops/backup.sh`, then a sentinel name change and a deleted attendance row, then `ops/restore.sh`: users/records/audit counts (4/5/7) and the sentinel matched the backup; API, web proxy and retention worker back in 18 s. |
 
 Repeat the drill once per quarter and add a row here.
 

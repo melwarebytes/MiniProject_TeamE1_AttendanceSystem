@@ -41,6 +41,25 @@ describe('[FR-13] Audit log viewer', () => {
     const res = await request(app).get('/api/v1/audit-logs').query({ from: 'yesterday' }).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(400);
   });
+
+  test('a date filter covers the whole IST day, not the UTC day', async () => {
+    const { user: admin, token } = await asUser('ADMIN');
+    const action = `DATE_FILTER_${Date.now()}`;
+    const entry = (createdAt) => ({ actorId: admin.id, action, entity: 'test', entityId: 'x', createdAt: new Date(createdAt) });
+    await prisma.auditLog.createMany({
+      data: [
+        entry('2026-11-11T19:00:00Z'), // 00:30 IST on 12 Nov: inside
+        entry('2026-11-12T18:00:00Z'), // 23:30 IST on 12 Nov: inside
+        entry('2026-11-12T19:00:00Z'), // 00:30 IST on 13 Nov: outside
+      ],
+    });
+    const res = await request(app)
+      .get('/api/v1/audit-logs')
+      .query({ action, from: '2026-11-12', to: '2026-11-12' })
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(2);
+  });
 });
 
 describe('[NFR-03] Health check', () => {

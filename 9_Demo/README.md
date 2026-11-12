@@ -1,5 +1,18 @@
 # 9 · Sprint demo
 
+## Sprint videos
+
+| Video | Length | Contents |
+|---|---|---|
+| [Sprint1_Demo.mp4](Sprint1_Demo.mp4) | 71 s | Sprint 1 outcome. Role-based login (FR-01), password reset (FR-02), user management and CSV import (FR-03), courses and enrolments (FR-04), timetable and extra session (FR-05), manual marking (FR-06), student dashboard (FR-09). Ends with the bugs fixed in the sprint review (PR #27). |
+| [Sprint2_Demo.mp4](Sprint2_Demo.mp4) | 109 s | Merull Shah's Sprint 2 items. QR check-in on a split screen with faculty and student, including replay and tampered-code rejections (#12 FR-07, SR-05). Audit log search with IST date filters (#17 FR-13). Health endpoint and backup/restore drill (#20 NFR-03/04). Ends with the bugs fixed (PR #28). |
+
+Both videos are recorded against the running Docker Compose stack with the real API and database. To re-record one, run this from `client/` against a running stack:
+`node e2e/sprint-demo.mjs 1|2 <scratchDir>`. Optional variables are listed at the top of the script.
+
+## CI evidence
+
+
 The **Deployment (Compose, seed, restore, live demo)** CI job publishes the
 `sprint-release-evidence` artifact on [PR #26](https://github.com/melwarebytes/MiniProject_TeamE1_AttendanceSystem/pull/26).
 Download it from the successful workflow run. The `demo/` directory contains

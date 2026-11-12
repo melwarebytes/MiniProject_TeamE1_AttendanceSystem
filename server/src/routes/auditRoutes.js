@@ -32,13 +32,11 @@ router.get(
       if (action) where.action = action;
       if (entity) where.entity = entity;
       if (from || to) {
+        // A bare YYYY-MM-DD is a whole IST calendar day, not a UTC day (the server runs in UTC).
+        const day = (d, time) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T${time}+05:30`) : new Date(d));
         where.createdAt = {};
-        if (from) where.createdAt.gte = new Date(from);
-        if (to) {
-          const end = new Date(to);
-          if (/^\d{4}-\d{2}-\d{2}$/.test(to)) end.setHours(23, 59, 59, 999); // whole day
-          where.createdAt.lte = end;
-        }
+        if (from) where.createdAt.gte = day(from, '00:00:00.000');
+        if (to) where.createdAt.lte = day(to, '23:59:59.999');
       }
       if (actor) {
         where.actor = {
