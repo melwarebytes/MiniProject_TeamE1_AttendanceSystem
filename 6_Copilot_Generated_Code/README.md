@@ -6,7 +6,7 @@ The application code lives in `/client` (React SPA) and `/server` (Node.js/Expre
 | Tool | Used for |
 |---|---|
 | GitHub Copilot | |
-| | |
+| OpenAI Codex | N S Raj Nanjappa's Sprint 2 issues and fixes in PR #26 (see [7_Software_Testing_Tools](../7_Software_Testing_Tools/README.md#ai-assisted-fixes-and-retests)) |
 
 ## Screenshots
 Save in `screenshots/` (prompt and generated code side by side works best).
@@ -16,4 +16,4 @@ Save in `screenshots/` (prompt and generated code side by side works best).
 | 1 | | | |
 
 ## Repository link
-https://github.com/melwarebytes/Student-Attendance-Management-System
+https://github.com/melwarebytes/MiniProject_TeamE1_AttendanceSystem

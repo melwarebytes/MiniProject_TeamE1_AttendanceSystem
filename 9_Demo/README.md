@@ -10,6 +10,20 @@
 Both videos are recorded against the running Docker Compose stack with the real API and database. To re-record one, run this from `client/` against a running stack:
 `node e2e/sprint-demo.mjs 1|2 <scratchDir>`. Optional variables are listed at the top of the script.
 
+## Screenshots
+
+Frames from the two videos, in `screenshots/`:
+
+| Sprint 1 | Sprint 2 |
+|---|---|
+| [Login (FR-01)](screenshots/s1_01_login_FR-01.png) | [QR window open (FR-07)](screenshots/s2_01_qr_window_FR-07.png) |
+| [User CSV import (FR-03)](screenshots/s1_02_users_csv_FR-03.png) | [Student checked in (FR-07)](screenshots/s2_02_qr_checked_in_FR-07.png) |
+| [Enrolment (FR-04)](screenshots/s1_03_enrolment_FR-04.png) | [Duplicate check-in rejected (SR-05)](screenshots/s2_03_qr_duplicate_rejected_SR-05.png) |
+| [Extra session (FR-05)](screenshots/s1_04_extra_session_FR-05.png) | [Tampered code rejected (SR-05)](screenshots/s2_04_qr_tampered_rejected_SR-05.png) |
+| [Manual marking (FR-06)](screenshots/s1_05_marking_FR-06.png) | [Audit log (FR-13)](screenshots/s2_05_audit_log_FR-13.png) |
+| [Student dashboard (FR-09)](screenshots/s1_06_student_dashboard_FR-09.png) | [Audit entry detail (FR-13)](screenshots/s2_06_audit_detail_FR-13.png) |
+| | [Backup and restore drill (NFR-03)](screenshots/s2_07_backup_restore_NFR-03.png) |
+
 ## CI evidence
 
 
