@@ -299,7 +299,7 @@ test('imports a full batch of 5000 valid passwordless accounts', async () => {
 }, 120000);
 
 test('configured QR duration is used when no per-session override is supplied', async () => {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = new Date(`${require('../services/qrService').istToday()}T00:00:00Z`);
   const s = await prisma.session.create({ data: { sectionId: section.id, date: today, startTime: '00:00', endTime: '23:59' } });
   const response = await api('post', `/sessions/${s.id}/qr`, faculty.token).send({});
   expect(response.status).toBe(201);

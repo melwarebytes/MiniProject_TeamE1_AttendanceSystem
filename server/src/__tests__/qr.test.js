@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { app, prisma, request, uid, asUser } = require('./helpers');
 const redis = require('../utils/redis');
+const { istToday } = require('../services/qrService');
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -15,8 +16,7 @@ async function classToday(faculty, student) {
   });
   await prisma.sectionFaculty.create({ data: { sectionId: section.id, userId: faculty.id } });
   if (student) await prisma.enrollment.create({ data: { sectionId: section.id, userId: student.id } });
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(`${istToday()}T00:00:00Z`); // QR windows open only on the IST class day
   const session = await prisma.session.create({ data: { sectionId: section.id, date: today, startTime: '09:00', endTime: '10:00' } });
   return { section, session };
 }
