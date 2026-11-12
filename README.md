@@ -9,8 +9,8 @@ SAMS is a web-based attendance system. Faculty take attendance from a roster or 
 | Name | SRN | GitHub | Role |
 |---|---|---|---|
 | Merull Shah | PES1UG24CS270 | [melwarebytes](https://github.com/melwarebytes) | Repository owner · authentication, QR check-in, CI |
-| N S Raj Nanjappa | PES1UG24CS287 | — | Admin modules, reports, performance testing |
-| N Bhuvan Teja | PES1UG24CS286 | — | Attendance marking, dashboard, leave and alerts |
+| N S Raj Nanjappa | PES1UG24CS287 | [rajnanjappaneyani](https://github.com/rajnanjappaneyani) | Admin modules, reports, performance testing |
+| N Bhuvan Teja | PES1UG24CS286 | [ZOnyxGH](https://github.com/ZOnyxGH) | Attendance marking, dashboard, leave and alerts |
 
 ## Features
 - Role-based login for Admin, Faculty and Student
@@ -37,6 +37,7 @@ React · Node.js 20 / Express · PostgreSQL 15 · Redis 7 · Docker · GitHub Ac
 | [7_Software_Testing_Tools](7_Software_Testing_Tools/) | Testing tools, AI-assisted bug fix and retest |
 | [8_Deployment](8_Deployment/) | Deployment steps, infrastructure, environment setup |
 | [9_Demo](9_Demo/) | Sprint demo videos and output screenshots |
+| [docs](docs/) | Index of all generated reports and test evidence |
 | `client/`, `server/` | Application source code |
 
 ## Getting Started
@@ -51,6 +52,8 @@ docker compose up --build
 | Dry run | 12–16 Oct 2026 | Practise branch → PR → review → merge |
 | Sprint 1 | 19–23 Oct 2026 | Login, admin setup, manual marking, student dashboard |
 | Sprint 2 | 26–30 Oct 2026 | QR check-in, corrections, leave, alerts, reports, audit log |
+
+Development is frozen at release 1.0 (commit `b662711`, 12 Nov 2026). Both sprint milestones are closed with all 21 backlog items done.
 
 Backlog and story points: [Work Breakdown Structure](1_SRS_and_WBS/Work_Breakdown_Structure.md) and the GitHub Project linked to this repository.
 
